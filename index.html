@@ -1525,17 +1525,6 @@ function viewEdit(y) {
       field('Tutor groups (leave blank if they are named after houses, like 7B and 7C)', 'groups', (draft.groups || []).join(', '), v => { draft.groups = v.split(/[\s,]+/).map(x => x.trim().replace(/^\d{1,2}/, '')).filter(Boolean); }),
       h('p', { class: 'hint', text: 'Used by the tutor group race slides on the side screens. Write the letters and numbers after the year, e.g. Q5, Q6, T4.' })));
 
-    // Lessons (read only)
-    const les = store.lessons[y];
-    const body = [];
-    if (!les || !les.periods) body.push(h('p', { class: 'empty', text: 'No timetable feed for this year yet.' }));
-    else {
-      const rows = [];
-      BELLS.forEach(b => (les.periods[b.p] || []).forEach(r => rows.push(h('tr', {}, h('td', { text: b.label }), h('td', { text: r.group }), h('td', { text: r.subject }), h('td', { text: r.room })))));
-      body.push(h('div', { class: 'ltable-wrap' }, h('table', { class: 'lt' }, h('thead', {}, h('tr', {}, ['Period', 'Group', 'Subject', 'Room'].map(t => h('th', { text: t })))), h('tbody', {}, rows))));
-    }
-    form.append(h('fieldset', {}, h('legend', {}, 'Timetable feed ', les && les.source === 'arbor' ? h('span', { class: 'pill live', text: 'From Arbor' }) : h('span', { class: 'pill sample', text: 'Sample' })),
-      h('p', { class: 'hint', text: 'Not edited here. The Up next panel picks the coming period from this feed. Once connected, Arbor keeps it current.' }), ...body));
     if (readOnly) form.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
   }
 
