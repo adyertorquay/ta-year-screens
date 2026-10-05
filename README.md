@@ -85,6 +85,10 @@ House points are read from an Arbor **live feed** (a report published as CSV or 
 
 If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
 
+## Celebrations for every year
+
+Each celebration has a "Show on" choice. "All year groups" (the default for new ones) saves it to `celebrations/all`, so it shows on every year's centre screen and can be edited from any year's editor. "Year N only" keeps it on that year's screen. Editors may write `celebrations/all` (see `supabase/schema.sql`).
+
 ## Homework reports (Sparx and Tassomai)
 
 Signed-in staff who can edit see a **Homework reports** section on the home page, with two uploads: **Sparx** (one report covering Maths, Reader and Science) and **Tassomai**.

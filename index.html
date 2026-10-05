@@ -513,13 +513,22 @@ let db = null, assets = null, user = null, dbState = 'loading';
 const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {} };
 // House points synced from Arbor (housepoints/<year>, else housepoints/all) replace the typed-in ones.
 const syncedHP = y => { const d = store.hp[y] || store.hp.all; return d && d.points ? d : null; };
-function withHP(y) { const raw = store.rawCentre[y], hp = syncedHP(y); store.screens[y] = hp ? Object.assign({}, raw || {}, { housePoints: hp.points }) : raw; }
+// Whole-school celebrations (celebrations/all) show on every year's centre screen, before the year's own.
+store.shared = [];
+function withHP(y) {
+  const raw = store.rawCentre[y], hp = syncedHP(y), sh = store.shared;
+  if (!hp && !sh.length) { store.screens[y] = raw; return; }
+  const out = Object.assign({}, raw || {}, hp ? { housePoints: hp.points } : {});
+  if (sh.length) out.celebrations = [...sh.map(c => Object.assign({}, c, { all: true })), ...((raw && raw.celebrations) || []).filter(c => !c.all)];
+  store.screens[y] = out;
+}
 const subs = {};
 const listeners = new Set();
 function subscribe(y) {
   if (!db || subs[y]) return;
   if (!subs._hpall) subs._hpall = db.doc('housepoints/all').onSnapshot(s => { store.hp.all = s.exists ? s.data() : null; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('hp', e));
   if (!subs._hw) subs._hw = Object.keys(HOMEWORK).map(k => db.doc('homework/' + k).onSnapshot(s => { store.homework[k] = s.exists ? s.data() : null; YEARS.forEach(emit); emit('homework'); }, e => console.warn('homework', e)));
+  if (!subs._celeb) subs._celeb = db.doc('celebrations/all').onSnapshot(s => { store.shared = s.exists ? (s.data().items || []) : []; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('celebrations', e));
   if (!subs._config) subs._config = db.doc('config/houses').onSnapshot(s => { store.mascots = s.exists ? (s.data().mascots || null) : null; YEARS.forEach(emit); }, e => console.warn('config', e));
   subs[y] = [
     ...['left', 'right'].map(side => db.doc('screens/' + y + '-' + side).onSnapshot(s => { store.screens[y + '-' + side] = s.exists ? s.data() : null; emit(y); }, e => console.warn('side', e))),
@@ -1450,11 +1459,11 @@ function viewEdit(y) {
     if (stale) touch();
     // One photo for the week (of both students together).
     const sPhoto = h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px' });
-    const renderP = () => sPhoto.replaceChildren(h('div', { style: 'width:100%;font-size:.85rem;font-weight:700;color:var(--muted)', text: 'Photo for the week (optional)' }),
+    const renderP = () => sPhoto.replaceChildren(...[h('div', { style: 'width:100%;font-size:.85rem;font-weight:700;color:var(--muted)', text: 'Photo for the week (optional)' }),
       draft.sotw.photo ? h('img', { class: 'thumb', src: photoUrl(draft.sotw.photo), alt: '' }) : h('div', { class: 'thumb' }),
       assets ? h('label', { class: 'btn small', for: 'sotw-file' }, draft.sotw.photo ? 'Replace photo' : 'Add photo',
         h('input', { id: 'sotw-file', type: 'file', accept: 'image/*', hidden: true, onchange: e => upload(e.target.files[0], draft.sotw, renderP) })) : h('span', { class: 'note', text: 'Photo upload needs Editor access.' }),
-      draft.sotw.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { draft.sotw.photo = ''; touch(); renderP(); }, text: 'Remove photo' }) : null);
+      draft.sotw.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { draft.sotw.photo = ''; touch(); renderP(); }, text: 'Remove photo' }) : null].filter(Boolean));
     renderP();
     const wkHint = h('span', { class: 'hint', style: 'margin:0', text: weekName(draft.sotw.weekOf) });
     const wkField = field('Week beginning', 'sotw-week', draft.sotw.weekOf, v => { draft.sotw.weekOf = v; wkHint.textContent = weekName(v); }, 'date');
@@ -1487,14 +1496,19 @@ function viewEdit(y) {
       return h('div', { class: 'item' },
         h('div', { class: 'wide' }, field('Headline', 'c-' + c.id + '-title', c.title, v => c.title = v)),
         h('div', { class: 'wide' }, field('Caption (optional)', 'c-' + c.id + '-cap', c.caption, v => c.caption = v)),
+        (() => { const id = 'c-' + c.id + '-where';
+          const sel = h('select', { id }, h('option', { value: 'all', text: 'All year groups' }), h('option', { value: 'year', text: yearName(y) + ' only' }));
+          sel.value = c.all ? 'all' : 'year';
+          sel.addEventListener('change', () => { c.all = sel.value === 'all'; touch(); });
+          return h('label', { class: 'f', for: id }, 'Show on', sel); })(),
         h('div', { class: 'tools' }, h('span', { style: 'display:flex;gap:10px;align-items:center' }, pic, up,
           c.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { c.photo = ''; touch(); renderC(); }, text: 'Remove photo' }) : null),
           h('span', {}, moveBtns(draft.celebrations, i, renderC), ' ', removeBtn(draft.celebrations, i, renderC))));
     }) : [h('div', { class: 'empty', text: 'No celebrations yet.' })]));
     renderC();
     form.append(h('fieldset', {}, h('legend', { text: 'Celebrations' }),
-      h('p', { class: 'hint', text: 'Trips, competitions, achievements. A photo fills the slide; without one it shows as a bold colour card. Check photo consent before uploading.' }),
-      cList, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { draft.celebrations.push({ id: uid(), title: '', caption: '', photo: '' }); touch(); renderC(); }, text: 'Add celebration' })));
+      h('p', { class: 'hint', text: 'Trips, competitions, achievements. Celebrations set to All year groups show on every year\'s screen and can be edited from any year. A photo fills the slide; without one it shows as a bold colour card. Check photo consent before uploading.' }),
+      cList, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { draft.celebrations.push({ id: uid(), title: '', caption: '', photo: '', all: true }); touch(); renderC(); }, text: 'Add celebration' })));
 
     // House points
     const hpSync = syncedHP(y);
@@ -1542,9 +1556,13 @@ function viewEdit(y) {
     const clean = clone(draft);
     clean.ticker = (clean.ticker || []).map(t => t.trim()).filter(Boolean);
     clean.updatedAt = new Date().toISOString();
+    const shared = clean.celebrations.filter(c => c.all).map(c => { const x = Object.assign({}, c); delete x.all; return x; });
+    clean.celebrations = clean.celebrations.filter(c => !c.all).map(c => { const x = Object.assign({}, c); delete x.all; return x; });
     try {
       await db.doc('screens/' + y).set(clean);
-      seen = JSON.stringify(clean); dirty = false; pendingRemote = false; banner.hidden = true;
+      // Only rewrite the shared list when this editor changed it, so an old tab can't undo another year's edits.
+      if (JSON.stringify(shared) !== sharedBase) { await db.doc('celebrations/all').set({ items: shared, updatedAt: clean.updatedAt }); sharedBase = JSON.stringify(shared); }
+      seen = JSON.stringify(store.screens[y] || null); dirty = false; pendingRemote = false; banner.hidden = true;
       setStatus('Saved. Screens update within a few seconds.', 'ok');
     } catch (e) {
       if (e && e.code === 'invalid_argument') { setStatus('You can view this screen but not change it. Ask the screens administrator for edit access.', 'bad'); }
@@ -1552,8 +1570,8 @@ function viewEdit(y) {
     } finally { saving = false; saveBtn.disabled = readOnly; }
   }
 
-  let seen = JSON.stringify(store.screens[y] || null);
-  function loadRemote() { draft = normal(store.screens[y]); seen = JSON.stringify(store.screens[y] || null); dirty = false; pendingRemote = false; banner.hidden = true; buildForm(); stage.setData(draft, store.lessons[y]); setStatus(''); }
+  let seen = JSON.stringify(store.screens[y] || null), sharedBase = JSON.stringify(store.shared);
+  function loadRemote() { draft = normal(store.screens[y]); seen = JSON.stringify(store.screens[y] || null); sharedBase = JSON.stringify(store.shared); dirty = false; pendingRemote = false; banner.hidden = true; buildForm(); stage.setData(draft, store.lessons[y]); setStatus(''); }
   const onData = yy => {
     if (yy !== y) return;
     if (JSON.stringify(store.screens[y] || null) === seen) { stage.setData(draft, store.lessons[y]); form.querySelectorAll('select.tg-select').forEach(el => el._refill && el._refill()); return; }
