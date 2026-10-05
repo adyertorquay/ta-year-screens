@@ -85,9 +85,28 @@ House points are read from an Arbor **live feed** (a report published as CSV or 
 
 If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
 
+## Timetable and term dates
+
+"Up next" shows every class in the year for the next period, from the Week A and Week B timetables. The week slide works out "Week A/B, teaching week N" by itself when its fields are left blank.
+
+**Which week it is** comes from the term dates near the top of the script in `index.html`:
+
+- **`TERMS`**: the first and last day of each term and half term (2026-27 at the moment). Add next year's dates before September.
+- **`NON_PUPIL_DAYS`**: single days off inside a term.
+- **`WEEK_ANCHOR`**: one Monday whose letter is known (Monday 5 October 2026 is Week B). Weeks then alternate A and B, skipping holiday weeks.
+- Teaching weeks restart at 1 at the start of each term (Autumn, Spring, Summer), counting from the first full week, and carry on through half term.
+
+**Updating the timetable** (for example in September):
+
+1. In Arbor, export the School Timetable report for one Week A and one Week B, as Excel.
+2. Run `pip install openpyxl`, then `python3 tools/build_timetable.py WeekA.xlsx WeekB.xlsx`.
+3. Paste the `timetable.sql` it writes into the screens' Supabase SQL editor and run it. The TVs update straight away.
+
+Staff names are never copied. If `timetable/y7` is missing for a year, "Up next" falls back to `lessons/y7` below.
+
 ## Next lessons (Arbor)
 
-The "Up next" panel reads the `screen_docs` row `lessons/y7` (one per year), in this shape:
+The fallback "Up next" source is the `screen_docs` row `lessons/y7` (one per year), in this shape:
 
 ```json
 {"source":"arbor","syncedAt":"2026-10-05T08:00:00Z",
@@ -113,5 +132,6 @@ Both of these are set near the top of the script in `index.html`:
 | `supabase/schema.sql` | Database setup |
 | `supabase/schedule.sql` | Optional 10-minute house points refresh |
 | `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |
+| `tools/build_timetable.py` | Arbor timetable exports to `timetable.sql` |
 | `media/` | House mascots, Keep TA Tidy posters, logo |
 | `data/demo.json` | Demo-mode sample data |

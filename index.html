@@ -440,7 +440,7 @@ const SLIDE_TYPES = {
   info: { label: 'Information', hint: 'Lines starting with "- " become bullets. "- 25% Attendance: detail" becomes a big tile.' },
   housepoints: { label: 'House points', hint: 'Shows the house points entered on the centre screen.' },
   sotw: { label: 'Students of the week', hint: 'Shows the students entered on the centre screen.' },
-  week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Update it each Monday.' },
+  week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Worked out automatically from the term dates.' },
 };
 const SLIDE_DEFAULTS = {
   list: { title: '', subtitle: '', items: '', emptyText: '' },
@@ -478,14 +478,14 @@ function hasContent(s, centre) {
     case 'info': return !!(s.title || s.body);
     case 'housepoints': return Object.values(centre.housePoints || {}).some(v => +v > 0);
     case 'sotw': return centre.sotw.students.some(x => x.name);
-    case 'week': return !!s.week;
+    case 'week': return !!(s.week || weekInfo(new Date()));
   }
   return false;
 }
 
 // ---------- data ----------
 let db = null, assets = null, user = null, dbState = 'loading';
-const store = { screens: {}, lessons: {}, seen: {}, mascots: null, rawCentre: {}, hp: {} };
+const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {} };
 // House points synced from Arbor (housepoints/<year>, else housepoints/all) replace the typed-in ones.
 const syncedHP = y => { const d = store.hp[y] || store.hp.all; return d && d.points ? d : null; };
 function withHP(y) { const raw = store.rawCentre[y], hp = syncedHP(y); store.screens[y] = hp ? Object.assign({}, raw || {}, { housePoints: hp.points }) : raw; }
@@ -500,6 +500,7 @@ function subscribe(y) {
     db.doc('screens/' + y).onSnapshot(s => { store.rawCentre[y] = s.exists ? s.data() : null; withHP(y); store.seen[y] = true; emit(y); }, e => console.warn('screen', e)),
     db.doc('housepoints/' + y).onSnapshot(s => { store.hp[y] = s.exists ? s.data() : null; withHP(y); emit(y); }, e => console.warn('hp', e)),
     db.doc('lessons/' + y).onSnapshot(s => { store.lessons[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('lessons', e)),
+    db.doc('timetable/' + y).onSnapshot(s => { store.timetable[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('timetable', e)),
   ];
 }
 function emit(y) { for (const fn of listeners) fn(y); }
@@ -659,14 +660,60 @@ function viewStaff() {
 
 
 // ---------- next lesson logic ----------
+// ---------- school calendar 2026-27 ----------
+// Term dates from the school. Week A/B alternates every school week (holiday weeks don't count); the week of
+// Monday 5 October 2026 is Week B. Teaching weeks are numbered from each term's first full week.
+const TERMS = [['2026-09-03', '2026-10-23'], ['2026-11-02', '2026-12-18'], ['2027-01-04', '2027-02-12'],
+  ['2027-02-22', '2027-03-25'], ['2027-04-12', '2027-05-28'], ['2027-06-07', '2027-07-16']];
+const TERM_GROUPS = [[0, 1], [2, 3], [4, 5]]; // Autumn, Spring, Summer
+const NON_PUPIL_DAYS = new Set(['2027-07-02', '2027-07-05']);
+const WEEK_ANCHOR = { monday: '2026-10-05', letter: 'B' };
+const isoDay = d => todayISO(d);
+const mondayOf = d => { const m = new Date(d.getFullYear(), d.getMonth(), d.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; };
+const termIndex = d => { const k = isoDay(d); return TERMS.findIndex(([a, b]) => k >= a && k <= b); };
+const isSchoolDay = d => d.getDay() >= 1 && d.getDay() <= 5 && termIndex(d) >= 0 && !NON_PUPIL_DAYS.has(isoDay(d));
+const SCHOOL_WEEKS = (() => { // Mondays of every week with at least one term day, in order
+  const out = [];
+  for (const [a, end] of TERMS) {
+    for (let m = mondayOf(new Date(a + 'T12:00:00')); isoDay(m) <= end; m.setDate(m.getDate() + 7)) {
+      const k = isoDay(m); if (!out.includes(k)) out.push(k);
+    }
+  }
+  return out;
+})();
+// Week letter and teaching week for a date. Outside term it gives the week school returns in.
+function weekInfo(d) {
+  const i = SCHOOL_WEEKS.findIndex(k => k >= isoDay(mondayOf(d)));
+  if (i < 0) return null;
+  const wk = SCHOOL_WEEKS[i];
+  const flip = (i - SCHOOL_WEEKS.indexOf(WEEK_ANCHOR.monday)) % 2 !== 0;
+  const letter = flip ? (WEEK_ANCHOR.letter === 'A' ? 'B' : 'A') : WEEK_ANCHOR.letter;
+  const fri = new Date(wk + 'T12:00:00'); fri.setDate(fri.getDate() + 4);
+  const g = TERM_GROUPS.find(([f, l]) => isoDay(fri) >= TERMS[f][0] && wk <= TERMS[l][1]);
+  let teaching = null;
+  if (g) { const fullStart = SCHOOL_WEEKS.find(k => k >= TERMS[g[0]][0]); if (wk >= fullStart) teaching = SCHOOL_WEEKS.filter(k => k >= fullStart && k <= wk).length; }
+  return { letter, teaching, monday: wk };
+}
+// Lessons for the period about to start: from the A/B timetable when there is one, else the simple feed.
+function lessonRows(y, les, np) {
+  const tt = store.timetable && store.timetable[y];
+  if (tt && tt.weeks) { const w = weekInfo(np.date); const day = w && tt.weeks[w.letter] && tt.weeks[w.letter][np.date.getDay()]; return (day && day[np.p]) || []; }
+  return (les && les.periods && les.periods[np.p]) || [];
+}
+function lessonSource(y, les, np) {
+  const tt = store.timetable && store.timetable[y];
+  if (tt && tt.weeks) { const w = weekInfo(np.date); return w ? 'Week ' + w.letter + ' timetable' : ''; }
+  return !les ? '' : les.source === 'arbor' ? 'From Arbor' + (les.syncedAt ? ', updated ' + new Date(les.syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sample timetable. Arbor will supply this.';
+}
+const hasLessons = (y, les) => !!(les || (store.timetable && store.timetable[y]));
+
 function nextPeriod(now) {
   const m = now.getHours() * 60 + now.getMinutes();
-  const wd = now.getDay();
-  if (wd >= 1 && wd <= 5) for (const b of BELLS) if (toMin(b.start) > m) return { ...b, inMin: toMin(b.start) - m, today: true };
-  const d = new Date(now); do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6);
+  if (isSchoolDay(now)) for (const b of BELLS) if (toMin(b.start) > m) return { ...b, inMin: toMin(b.start) - m, today: true, date: now };
+  const d = new Date(now); let guard = 0; do d.setDate(d.getDate() + 1); while (!isSchoolDay(d) && ++guard < 120);
   const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
   const dayLabel = d.toDateString() === tomorrow.toDateString() ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'long' });
-  return { ...BELLS[0], today: false, dayLabel };
+  return { ...BELLS[0], today: false, dayLabel, date: d };
 }
 
 // ---------- the TV stage (used full screen and as the editor preview) ----------
@@ -765,21 +812,21 @@ class Stage {
   }
   renderNext(force) {
     const np = nextPeriod(new Date());
-    const key = np.p + np.today + (this.les ? JSON.stringify(this.les).length : 0);
+    const rows = lessonRows(this.year, this.les, np);
+    const key = np.p + np.today + isoDay(np.date) + JSON.stringify(rows);
     $('.np', this.el).textContent = np.label;
     const when = $('.next-when', this.el);
     if (np.today) when.replaceChildren('Starts ', h('b', { text: np.start }), np.inMin <= 90 ? ' · in ' + np.inMin + ' min' : '');
     else when.replaceChildren(np.dayLabel + ' at ', h('b', { text: np.start }));
     if (!force && key === this.nextKey) return;
     this.nextKey = key;
-    const rows = (this.les && this.les.periods && this.les.periods[np.p]) || [];
     const list = $('.next-list', this.el);
     list.classList.toggle('dense', rows.length > 8);
     list.classList.toggle('xdense', rows.length > 10);
-    if (!rows.length) list.replaceChildren(h('div', { class: 'next-empty', text: this.les ? 'No lessons listed for this period.' : 'Lessons will show here once the timetable is connected.' }));
+    if (!rows.length) list.replaceChildren(h('div', { class: 'next-empty', text: hasLessons(this.year, this.les) ? 'No lessons listed for this period.' : 'Lessons will show here once the timetable is connected.' }));
     else list.replaceChildren(...rows.slice(0, 14).map(r => h('div', { class: 'lrow' }, h('span', { class: 'g', text: r.group }), h('span', { class: 's', text: r.subject }), h('span', { class: 'r', text: r.room }))));
     const src = $('.src', this.el);
-    src.textContent = !this.les ? '' : this.les.source === 'arbor' ? 'From Arbor' + (this.les.syncedAt ? ', updated ' + new Date(this.les.syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sample timetable. Arbor will supply this.';
+    src.textContent = lessonSource(this.year, this.les, np);
   }
   renderTicker() {
     const lines = []; // The scrolling news bar is switched off (school's choice, 2026-10-05); any saved lines are kept but not shown.
@@ -804,11 +851,9 @@ class Stage {
 }
 
 // ---------- portrait side screens ----------
-function nextInfo(les) {
+function nextInfo(y, les) {
   const np = nextPeriod(new Date());
-  const rows = (les && les.periods && les.periods[np.p]) || [];
-  const src = !les ? '' : les.source === 'arbor' ? 'From Arbor' + (les.syncedAt ? ', updated ' + new Date(les.syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sample timetable. Arbor will supply this.';
-  return { np, rows, src };
+  return { np, rows: lessonRows(y, les, np), src: lessonSource(y, les, np) };
 }
 function infoBody(body) {
   const out = []; let tiles = null, bullets = null;
@@ -927,10 +972,13 @@ class PortraitStage {
       case 'value':
         return wrap('p-value', pad(h('div', { class: 's-eyebrow', text: s.title || 'Value of the week' }), h('div', { class: 'value-word', text: s.value || '' }),
           s.photo ? h('img', { class: 'value-img', src: photoUrl(s.photo), alt: '' }) : null, s.text ? h('p', { class: 'info-p', text: s.text }) : null));
-      case 'week':
+      case 'week': {
+        const auto = weekInfo(new Date()) || {};
+        const letter = s.week || auto.letter || '', tw = s.week ? s.teachingWeek : auto.teaching;
         return wrap('p-week', pad(h('div', { class: 's-eyebrow', text: s.title || VALUES_LINE }),
-          h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: s.week || '' })),
-          s.teachingWeek ? h('div', { class: 'wk-t', text: 'Teaching week ' + s.teachingWeek }) : null));
+          h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: letter })),
+          tw ? h('div', { class: 'wk-t', text: 'Teaching week ' + tw }) : null));
+      }
       case 'poster':
         return wrap('p-poster', s.photo ? h('img', { src: photoUrl(s.photo), alt: s.title || '' }) : pad(h('div', { class: 'p-empty', text: 'Add an image for this poster.' })));
       case 'info':
@@ -955,7 +1003,7 @@ class PortraitStage {
     [...$('.spot-dots', this.el).children].forEach((el, i) => el.classList.toggle('on', i === this.idx));
   }
   renderNext(force) {
-    const { np, rows, src } = nextInfo(this.les);
+    const { np, rows, src } = nextInfo(this.year, this.les);
     $('.np', this.el).textContent = np.label;
     const when = $('.next-when', this.el);
     if (np.today) when.replaceChildren('Starts ', h('b', { text: np.start }), np.inMin <= 90 ? ' · in ' + np.inMin + ' min' : '');
@@ -964,7 +1012,7 @@ class PortraitStage {
     if (!force && key === this.nextKey) return;
     this.nextKey = key;
     const grid = $('.p-grid', this.el);
-    if (!rows.length) grid.replaceChildren(h('div', { class: 'next-empty', style: 'grid-column:1/-1', text: this.les ? 'No lessons listed for this period.' : 'Lessons will show here once the timetable is connected.' }));
+    if (!rows.length) grid.replaceChildren(h('div', { class: 'next-empty', style: 'grid-column:1/-1', text: hasLessons(this.year, this.les) ? 'No lessons listed for this period.' : 'Lessons will show here once the timetable is connected.' }));
     else grid.replaceChildren(...rows.slice(0, 12).map(r => h('div', { class: 'chip', style: '--c:' + groupColor(r.group) },
       h('div', { class: 'chip-top' }, h('b', { text: r.group }), h('i', { text: r.room })), h('span', { text: r.subject }))));
     $('.src', this.el).textContent = src;
@@ -1322,7 +1370,7 @@ function viewEditSide(y, side) {
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
-      case 'week': body.append(F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
+      case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the term dates (this week: ' + (w => w ? 'Week ' + w.letter + (w.teaching ? ', teaching week ' + w.teaching : '') : 'outside term')(weekInfo(new Date())) + '). Fill these in only to override it.' }), F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
       case 'housepoints': body.append(F('Title', 'title', 'text', {}, true)); break;
     }
     const showId = 'sl-' + s.id + '-show';
