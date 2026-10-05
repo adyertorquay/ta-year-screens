@@ -186,6 +186,10 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .sotw-card b { display: block; font-family: var(--display); font-weight: 700; font-size: 50px; line-height: 1.05; }
 .sotw-card span { display: block; font-size: 26px; color: var(--tv-dim); margin-top: 6px; }
 .sotw-card p { margin: 12px 0 0; font-size: 28px; line-height: 1.3; }
+.sotw-card.pic { display: flex; gap: 24px; align-items: center; }
+.sotw-card.pic > div { min-width: 0; }
+.sotw-pic { width: 200px; aspect-ratio: 1; object-fit: cover; border-radius: 14px; flex: none; background: var(--line); }
+.sotw-grid:not(.n1) .sotw-pic { width: 150px; }
 .slide.sotw .s-title { font-size: 76px; }
 .slide.welcome { justify-content: center; }
 .side { display: grid; grid-template-rows: 1fr auto; gap: 24px; min-height: 0; }
@@ -949,6 +953,18 @@ function sotwWeek(d = new Date()) {
   if (day.getDay() === 5 || day.getDay() === 6 || day.getDay() === 0) day.setDate(day.getDate() + 7 - ((day.getDay() + 6) % 7));
   const w = weekInfo(day); return w ? w.monday : isoDay(mondayOf(day));
 }
+const tutorGroups = (y, centre) => {
+  const up = ['sparx-maths', 'sparx-science', 'sparx-reader', 'tassomai'].map(k => store.homework && store.homework[k] && store.homework[k].years && store.homework[k].years[y]).find(Boolean);
+  if (up) return Object.keys(up.groups).filter(L => !hwHidden(y, L)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).map(L => y.slice(1) + L);
+  // else the tutor time groups in the timetable, else the screen's usual list
+  const tt = store.timetable && store.timetable[y], p1 = tt && tt.weeks && tt.weeks.A && tt.weeks.A['1'] && tt.weeks.A['1'].P1;
+  const fromTT = (p1 || []).map(e => e.group).filter(g => /^(7|8|9|10|11)[A-Z]{1,3}\d?$/.test(g) && !hwHidden(y, g.slice(y.length - 1)));
+  if (fromTT.length) return [...new Set(fromTT)].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+  return groupsOf(centre).map(L => y.slice(1) + L);
+};
+const sotwCard = (x, c) => h('div', { class: 'sotw-card' + (x.photo ? ' pic' : ''), style: '--c:' + c },
+  x.photo ? h('img', { class: 'sotw-pic', src: photoUrl(x.photo), alt: '' }) : null,
+  h('div', {}, h('b', { text: x.name }), x.group ? h('span', { text: x.group }) : null));
 const weekName = iso => { const w = WEEK_PLAN.find(x => x.monday === iso); return w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : ''; };
 // Lessons for the period about to start: from the A/B timetable when there is one, else the simple feed.
 function lessonRows(y, les, np) {
@@ -1032,8 +1048,7 @@ class Stage {
       return h('div', { class: 'slide sotw' }, h('div', { class: 's-pad' },
         h('div', { class: 's-eyebrow', text: s.sotw.weekOf ? 'Week of ' + fmtDate(s.sotw.weekOf, { day: 'numeric', month: 'long' }) : 'This week' }),
         h('div', { class: 's-title', text: st.length > 1 ? 'Students of the Week' : 'Student of the Week' }),
-        h('div', { class: 'sotw-grid' + (st.length === 1 ? ' n1' : '') }, st.map((x, i) => h('div', { class: 'sotw-card', style: '--c:' + HC[(i * 3) % 8] },
-          h('b', { text: x.name }), x.group ? h('span', { text: x.group }) : null, x.reason ? h('p', { text: x.reason }) : null)))));
+        h('div', { class: 'sotw-grid' + (st.length === 1 ? ' n1' : '') }, st.map((x, i) => sotwCard(x, HC[(i * 3) % 8])))));
     }
     if (sl.type === 'celebrate') {
       const c = sl.c;
@@ -1248,7 +1263,7 @@ class PortraitStage {
       case 'sotw': {
         const st = this.centre.sotw.students.filter(x => x.name).slice(0, 6);
         return wrap('p-list', pad(...head(this.centre.sotw.weekOf ? 'Week of ' + fmtDate(this.centre.sotw.weekOf, { day: 'numeric', month: 'long' }) : 'This week', st.length > 1 ? 'Students of the Week' : 'Student of the Week'),
-          st.length ? h('div', { class: 'sotw-grid n1' }, st.map((x, k) => h('div', { class: 'sotw-card', style: '--c:' + groupColor(x.group) }, h('b', { text: x.name }), x.group ? h('span', { text: x.group }) : null, x.reason ? h('p', { text: x.reason }) : null)))
+          st.length ? h('div', { class: 'sotw-grid n1' }, st.map(x => sotwCard(x, groupColor(x.group))))
             : h('div', { class: 'p-empty', text: 'Add students of the week on the centre screen.' })));
       }
     }
@@ -1405,22 +1420,38 @@ function viewEdit(y) {
     form.replaceChildren();
     // Students of the week
     const sList = h('div', { class: 'items' });
+    // Tutor groups for this year: the real ones from the latest homework upload, else the screen's usual list.
+    const groupSel = s => {
+      const id = 's-' + s.id + '-group', opts = tutorGroups(y, draft);
+      if (s.group && !opts.includes(s.group)) opts.unshift(s.group);
+      const sel = h('select', { id }, h('option', { value: '', text: 'Choose…' }), opts.map(g => h('option', { value: g, text: g })));
+      sel.value = s.group || '';
+      sel.addEventListener('change', () => { s.group = sel.value; touch(); });
+      return h('label', { class: 'f', for: id }, 'Tutor group', sel);
+    };
     const renderS = () => sList.replaceChildren(...(draft.sotw.students.length ? draft.sotw.students.map((s, i) => h('div', { class: 'item' },
       field('Name', 's-' + s.id + '-name', s.name, v => s.name = v),
-      field('Tutor group', 's-' + s.id + '-group', s.group, v => s.group = v),
-      h('div', { class: 'wide' }, field('Why (one line)', 's-' + s.id + '-reason', s.reason, v => s.reason = v)),
+      groupSel(s),
+      (() => { const fileId = 's-' + s.id + '-file';
+        return h('div', { class: 'wide', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
+          s.photo ? h('img', { class: 'thumb', src: photoUrl(s.photo), alt: '' }) : h('div', { class: 'thumb' }),
+          assets ? h('label', { class: 'btn small', for: fileId }, s.photo ? 'Replace photo' : 'Add photo',
+            h('input', { id: fileId, type: 'file', accept: 'image/*', hidden: true, onchange: e => upload(e.target.files[0], s, renderS) })) : h('span', { class: 'note', text: 'Photo upload needs Editor access.' }),
+          s.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { s.photo = ''; touch(); renderS(); }, text: 'Remove photo' }) : null); })(),
       h('div', { class: 'tools' }, moveBtns(draft.sotw.students, i, renderS), removeBtn(draft.sotw.students, i, renderS)))) : [h('div', { class: 'empty', text: 'No students added this week.' })]));
     renderS();
-    // An empty list gets the coming week automatically (it is only saved if something else is saved).
-    if (!draft.sotw.students.length) draft.sotw.weekOf = sotwWeek();
+    // Each new week starts by itself: an empty or out-of-date list moves to the coming week (saved with the next Save).
+    const wkNow = sotwWeek(), stale = draft.sotw.students.length > 0 && (draft.sotw.weekOf || '') < wkNow;
+    if (!draft.sotw.students.length || stale) { draft.sotw.students = []; draft.sotw.weekOf = wkNow; renderS(); }
+    if (stale) touch();
     const wkHint = h('span', { class: 'hint', style: 'margin:0', text: weekName(draft.sotw.weekOf) });
     const wkField = field('Week beginning', 'sotw-week', draft.sotw.weekOf, v => { draft.sotw.weekOf = v; wkHint.textContent = weekName(v); }, 'date');
     form.append(h('fieldset', {}, h('legend', { text: 'Students of the week' }),
-      h('p', { class: 'hint', text: 'Up to six show on screen. First names and tutor group are enough. They are chosen on Fridays, so from Friday the week moves on to the next school week.' }),
+      h('p', { class: 'hint', text: 'Up to six show on screen. First names, tutor group and a photo (with consent) are enough. They are chosen on Fridays and shown through the next week, so each Friday this starts a fresh list for the coming school week.' }),
+      stale ? h('p', { class: 'note', text: 'Last week\'s students have been cleared for the new week. Save to update the screens.' }) : null,
       h('div', { style: 'display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px' }, h('div', { style: 'width:240px' }, wkField), h('div', { style: 'padding-bottom:10px' }, wkHint)),
       sList, h('div', { style: 'margin-top:12px;display:flex;gap:8px;flex-wrap:wrap' },
-        h('button', { class: 'btn', type: 'button', onclick: () => { draft.sotw.students.push({ id: uid(), name: '', group: '', reason: '' }); touch(); renderS(); }, text: 'Add student' }),
-        h('button', { class: 'btn ghost', type: 'button', onclick: () => { draft.sotw.students = []; draft.sotw.weekOf = sotwWeek(); $('#sotw-week').value = draft.sotw.weekOf; wkHint.textContent = weekName(draft.sotw.weekOf); touch(); renderS(); }, text: 'Start a new week' }))));
+        h('button', { class: 'btn', type: 'button', onclick: () => { draft.sotw.students.push({ id: uid(), name: '', group: '' }); touch(); renderS(); }, text: 'Add student' }))));
 
     // Notices
     const nList = h('div', { class: 'items' });
