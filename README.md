@@ -87,13 +87,13 @@ If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `
 
 ## Homework reports (Sparx and Tassomai)
 
-Signed-in staff who can edit see a **Homework reports** section on the home page, with an upload for Sparx Maths, Sparx Reader, Sparx Science and Tassomai.
+Signed-in staff who can edit see a **Homework reports** section on the home page, with two uploads: **Sparx** (one report covering Maths, Reader and Science) and **Tassomai**.
 
-1. Export the report from Sparx or Tassomai as Excel or CSV, with one row per student.
-2. Choose the file. The page guesses which column holds the tutor group (for example 7B or 11Q5) and which holds the completion, points or score. Change them in the drop-downs if needed. A summary for each year shows before anything is saved.
+1. Export the report as Excel or CSV, with one row per student. The Sparx columns can be on one sheet or on separate Maths, Reader and Science sheets.
+2. Choose the file. The page guesses the tutor group column (for example 7B or 11Q5) and the Maths, Reader, Science or score columns, using the column and sheet names. Change them in the drop-downs if needed; "Not in this file" skips one. A summary for each year shows before anything is saved.
 3. Press Upload.
 
-The file is read in the browser. Only tutor group and whole-year totals are saved (`homework/sparx-maths` and so on), never student names.
+The file is read in the browser. Only tutor group and whole-year totals are saved (`homework/sparx-maths`, `homework/sparx-reader`, `homework/sparx-science` and `homework/tassomai`), never student names.
 
 Race and breakdown slides use the upload automatically when their title starts with "Sparx Maths", "Sparx Reader", "Sparx Science" or "Tassomai". In the editor, "Numbers come from" on those slides can change this or switch back to typed-in numbers.
 

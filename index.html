@@ -531,10 +531,10 @@ const XLSX_SRC = 'vendor/xlsx.full.min.js';
 // Staff upload the exports on the home page. The file is read in this browser and only tutor group and whole-year
 // totals are saved (homework/<kind>), never student names. Race and breakdown slides titled "Sparx Maths" etc. use them.
 const HOMEWORK = {
-  'sparx-maths': { name: 'Sparx Maths', what: 'completion', value: [/compuls/i, /complet/i, /% ?done|progress/i, /homework/i] },
-  'sparx-reader': { name: 'Sparx Reader', what: 'points', value: [/srp/i, /reading ?points/i, /points/i] },
-  'sparx-science': { name: 'Sparx Science', what: 'completion', value: [/compuls/i, /complet/i, /% ?done|progress/i, /homework/i] },
-  'tassomai': { name: 'Tassomai', what: 'score', value: [/score/i, /points/i, /daily goal/i, /quiz/i] },
+  'sparx-maths': { name: 'Sparx Maths', col: 'Maths column', what: 'completion', value: [/math.*(compuls|complet|%)/i, /(compuls|complet|%).*math/i, /math/i] },
+  'sparx-reader': { name: 'Sparx Reader', col: 'Reader column', what: 'points', value: [/srp/i, /(reader|reading).*point/i, /point.*(reader|reading)/i, /reader|reading/i] },
+  'sparx-science': { name: 'Sparx Science', col: 'Science column', what: 'completion', value: [/scien.*(compuls|complet|%)/i, /(compuls|complet|%).*scien/i, /scien/i] },
+  'tassomai': { name: 'Tassomai', col: 'Score column', what: 'score', value: [/score/i, /points/i, /daily goal/i, /quiz/i] },
 };
 const HW_BANDS = {
   completion: { col: 'Completion column', metric: '% of class on 100%', unit: '%', bands: [['On 100%', v => v >= 100], ['75 to 99%', v => v >= 75], ['Below 75%', v => v > 0], ['Not started', () => true]] },
@@ -561,15 +561,19 @@ const loadXLSX = () => xlsxLib || (xlsxLib = new Promise((ok, no) => {
   sc.onload = () => ok(window.XLSX); sc.onerror = () => { xlsxLib = null; no(new Error('The spreadsheet reader did not load. Check the connection and try again.')); };
   document.head.append(sc);
 }));
-// The biggest sheet; its header is the first row with at least three filled cells.
-async function readSheet(file) {
+// Every sheet that holds a table. A table's header is its first row with at least three filled cells.
+async function readBook(file) {
   const X = await loadXLSX();
   const wb = X.read(await file.arrayBuffer(), { type: 'array' });
-  let best = [];
-  for (const n of wb.SheetNames) { const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: true }); if (rows.length > best.length) best = rows; }
-  const hi = best.findIndex(r => r.filter(c => String(c).trim()).length >= 3);
-  if (hi < 0) throw new Error('No table was found in that file.');
-  return { head: best[hi].map((c, i) => String(c).trim() || 'Column ' + (i + 1)), rows: best.slice(hi + 1).filter(r => r.some(c => String(c).trim())) };
+  const tables = [];
+  for (const sheet of wb.SheetNames) {
+    const all = X.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: '', raw: true });
+    const hi = all.findIndex(r => r.filter(c => String(c).trim()).length >= 3);
+    if (hi < 0) continue;
+    tables.push({ sheet, head: all[hi].map((c, i) => String(c).trim() || 'Column ' + (i + 1)), rows: all.slice(hi + 1).filter(r => r.some(c => String(c).trim())) });
+  }
+  if (!tables.length) throw new Error('No table was found in that file.');
+  return tables;
 }
 const GROUP_RX = /(?:^|[^0-9])(7|8|9|10|11)\s?([A-Z]{1,2}\d?)(?![A-Za-z])/i;
 const toNum = x => {
@@ -580,18 +584,14 @@ const toNum = x => {
   if (/^(not started|none|no|-)$/i.test(t)) return 0;
   const m = t.replace(/,/g, '').match(/^-?\d+(\.\d+)?/); return m ? +m[0] : null;
 };
-function guessCols(t, kind) {
-  const sample = i => t.rows.slice(0, 300).map(r => r[i]).filter(v => String(v ?? '').trim());
-  const share = (i, f) => { const s = sample(i); return s.length ? s.filter(f).length / s.length : 0; };
-  const groupish = i => share(i, v => GROUP_RX.test(String(v))) > 0.6, numeric = i => share(i, v => toNum(v) != null) > 0.6;
-  let g = t.head.findIndex((x, i) => /tutor|form|reg/i.test(x) && groupish(i));
-  if (g < 0) g = t.head.findIndex((x, i) => /group|class/i.test(x) && groupish(i));
-  if (g < 0) g = t.head.findIndex((x, i) => groupish(i));
-  let v = -1;
-  for (const rx of HOMEWORK[kind].value) if (v < 0) v = t.head.findIndex((x, i) => i !== g && rx.test(x) && numeric(i));
-  if (v < 0) v = t.head.findIndex((x, i) => i !== g && numeric(i) && !/id|upn|year/i.test(x));
-  return { g, v };
+const colShare = (t, i, f) => { const s = t.rows.slice(0, 300).map(r => r[i]).filter(v => String(v ?? '').trim()); return s.length ? s.filter(f).length / s.length : 0; };
+const isGroupCol = (t, i) => colShare(t, i, v => GROUP_RX.test(String(v))) > 0.6;
+const isNumCol = (t, i) => colShare(t, i, v => toNum(v) != null) > 0.6;
+function guessGroup(t) {
+  for (const rx of [/tutor|form|reg/i, /group|class/i, /./]) { const g = t.head.findIndex((x, i) => rx.test(x) && isGroupCol(t, i)); if (g >= 0) return g; }
+  return -1;
 }
+const guessValue = (t, kind, g) => { for (const rx of HOMEWORK[kind].value) { const v = t.head.findIndex((x, i) => i !== g && rx.test(t.sheet + ' ' + x) && isNumCol(t, i)); if (v >= 0) return v; } return -1; };
 const round1 = v => Math.round(v * 10) / 10;
 function summarise(t, kind, g, v) {
   const b = HW_BANDS[HOMEWORK[kind].what];
@@ -614,58 +614,80 @@ function summarise(t, kind, g, v) {
     breakdown: b.bands.map(([label], k) => ({ label, value: round1(Y.band[k] / Y.n * 100) })) };
   return { years: out, used, skipped: t.rows.length - used };
 }
+// One upload per report: Sparx is a single report covering Maths, Reader and Science.
+const HW_UPLOADS = [
+  { name: 'Sparx', sub: 'Maths, Reader and Science in one report, .xlsx or .csv', kinds: ['sparx-maths', 'sparx-reader', 'sparx-science'] },
+  { name: 'Tassomai', sub: 'Export file, .xlsx or .csv', kinds: ['tassomai'] },
+];
 function homeworkPanel() {
   return h('section', { class: 'hw' },
     h('div', { class: 'hw-head' }, h('h2', { text: 'Homework reports' }),
-      h('p', { text: 'Upload the latest Sparx and Tassomai exports to update the homework slides on every screen. Only tutor group and year totals are saved, never student names.' })),
-    h('div', { class: 'hw-grid' }, Object.keys(HOMEWORK).map(hwCard)));
+      h('p', { text: 'Upload the latest Sparx and Tassomai reports to update the homework slides on every screen. Only tutor group and year totals are saved, never student names.' })),
+    h('div', { class: 'hw-grid' }, HW_UPLOADS.map(hwCard)));
 }
-function hwCard(kind) {
-  const k = HOMEWORK[kind], b = HW_BANDS[k.what];
+function hwCard(up) {
   const pill = h('span', { class: 'pill' });
-  const input = h('input', { type: 'file', accept: '.xlsx,.xls,.csv', 'aria-label': k.name + ' export file' });
-  const gSel = h('select'), vSel = h('select');
-  const cols = h('div', { class: 'hw-cols' }, h('label', { class: 'f' }, 'Tutor group column', gSel), h('label', { class: 'f' }, b.col, vSel));
+  const input = h('input', { type: 'file', accept: '.xlsx,.xls,.csv', 'aria-label': up.name + ' report file' });
+  const gSel = h('select'), vSel = Object.fromEntries(up.kinds.map(k => [k, h('select')]));
+  const cols = h('div', { class: 'hw-cols' }, h('label', { class: 'f' }, 'Tutor group column', gSel),
+    up.kinds.map(k => h('label', { class: 'f' }, HOMEWORK[k].col, vSel[k])));
   cols.hidden = true;
   const out = h('div', { class: 'hw-out' });
   const btn = h('button', { class: 'btn primary', type: 'button', text: 'Upload', disabled: true });
-  const card = h('div', { class: 'hw-card' }, h('div', { class: 'hw-top' }, h('div', {}, h('h3', { text: k.name }), h('div', { class: 'sub', text: 'Export file, .xlsx or .csv' })), pill), input, cols, out, btn);
-  let table = null, result = null;
+  const card = h('div', { class: 'hw-card' }, h('div', { class: 'hw-top' }, h('div', {}, h('h3', { text: up.name }), h('div', { class: 'sub', text: up.sub })), pill), input, cols, out, btn);
+  let tables = null, results = null;
   card._fill = () => {
-    const d = store.homework[kind], when = d && d.uploadedAt;
+    const times = up.kinds.map(k => store.homework[k] && store.homework[k].uploadedAt).filter(Boolean).sort();
+    const when = times[times.length - 1];
     pill.textContent = when ? 'Uploaded ' + agoText(when) : 'Not uploaded yet';
     card.classList.toggle('fresh', !!when && Date.now() - Date.parse(when) < 864e5);
     card.classList.toggle('stale', !!when && Date.now() - Date.parse(when) >= 864e5);
   };
   const say = (text, err) => { out.textContent = text; out.classList.toggle('err', !!err); };
+  const pick = sel => { const [t, c] = String(sel.value).split(':').map(Number); return sel.value ? { t, c } : null; };
   const preview = () => {
-    result = null; btn.disabled = true;
-    const g = +gSel.value, v = +vSel.value;
-    if (g < 0 || v < 0) return say('Choose the tutor group column and the ' + b.col.toLowerCase() + '.', true);
-    const r = summarise(table, kind, g, v);
-    if (!r.used) return say('No tutor groups like 7B or 11Q5 were found in "' + table.head[g] + '".', true);
-    const lines = YEARS.filter(y => r.years[y]).map(y => { const Y = r.years[y], top = Y.breakdown[0];
-      return yearName(y) + ': ' + Y.students + ' students, ' + (b.unit === '%' ? fmtNum(top.value) + '% on 100%' : 'average ' + fmtNum(Y.average)); });
-    if (r.skipped) lines.push(r.skipped + ' row' + (r.skipped === 1 ? '' : 's') + ' had no tutor group and ' + (r.skipped === 1 ? 'was' : 'were') + ' left out.');
-    say(lines.join('\n')); result = r; btn.disabled = false;
+    results = null; btn.disabled = true;
+    const gp = pick(gSel), lines = [], res = {};
+    for (const k of up.kinds) {
+      const vp = pick(vSel[k]); if (!vp) continue;
+      const t = tables[vp.t], g = gp && gp.t === vp.t ? gp.c : guessGroup(t), b = HW_BANDS[HOMEWORK[k].what], label = HOMEWORK[k].name;
+      if (g < 0) { lines.push(label + ': choose the tutor group column.'); continue; }
+      const r = summarise(t, k, g, vp.c);
+      if (!r.used) { lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
+      res[k] = { r, group: t.head[g], value: t.head[vp.c] };
+      lines.push(label + ': ' + YEARS.filter(y => r.years[y]).map(y => yearName(y) + ' ' + (b.unit === '%' ? fmtNum(r.years[y].breakdown[0].value) + '% on 100%' : 'average ' + fmtNum(r.years[y].average))).join(', '));
+    }
+    if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
+    const any = Object.values(res)[0].r;
+    lines.unshift(any.used + ' students read' + (any.skipped ? ', ' + any.skipped + ' row' + (any.skipped === 1 ? '' : 's') + ' without a tutor group left out' : '') + '.');
+    say(lines.join('\n')); results = res; btn.disabled = false;
   };
   input.addEventListener('change', async () => {
-    table = null; result = null; btn.disabled = true; cols.hidden = true;
+    tables = null; results = null; btn.disabled = true; cols.hidden = true;
     const f = input.files && input.files[0]; if (!f) return say('');
     say('Reading ' + f.name + '…');
-    try { table = await readSheet(f); } catch (e) { return say(e.message || 'That file could not be read.', true); }
-    const opts = sel => sel.replaceChildren(h('option', { value: -1, text: 'Choose…' }), ...table.head.map((x, i) => h('option', { value: i, text: x })));
-    opts(gSel); opts(vSel);
-    const guess = guessCols(table, kind); gSel.value = guess.g; vSel.value = guess.v;
+    try { tables = await readBook(f); } catch (e) { return say(e.message || 'That file could not be read.', true); }
+    const opts = (sel, none) => sel.replaceChildren(h('option', { value: '', text: none }),
+      ...tables.flatMap((t, ti) => t.head.map((x, ci) => h('option', { value: ti + ':' + ci, text: tables.length > 1 ? t.sheet + ': ' + x : x }))));
+    opts(gSel, 'Choose…'); up.kinds.forEach(k => opts(vSel[k], 'Not in this file'));
+    let firstT = -1;
+    for (const k of up.kinds) for (let ti = 0; ti < tables.length; ti++) {
+      if (vSel[k].value) break;
+      const v = guessValue(tables[ti], k, guessGroup(tables[ti])); if (v >= 0) { vSel[k].value = ti + ':' + v; if (firstT < 0) firstT = ti; }
+    }
+    const gt = firstT >= 0 ? firstT : tables.findIndex(t => guessGroup(t) >= 0);
+    if (gt >= 0 && guessGroup(tables[gt]) >= 0) gSel.value = gt + ':' + guessGroup(tables[gt]);
     cols.hidden = false; preview();
   });
-  gSel.addEventListener('change', preview); vSel.addEventListener('change', preview);
+  gSel.addEventListener('change', preview); Object.values(vSel).forEach(s => s.addEventListener('change', preview));
   btn.addEventListener('click', async () => {
-    if (!result) return;
-    btn.disabled = true; const was = out.textContent; say('Saving…');
+    if (!results) return;
+    btn.disabled = true; say('Saving…');
     try {
-      await db.doc('homework/' + kind).set({ uploadedAt: new Date().toISOString(), rows: result.used, groupColumn: table.head[+gSel.value], valueColumn: table.head[+vSel.value], years: result.years });
-      input.value = ''; cols.hidden = true; table = null; result = null; say('Saved. The screens update in a few seconds.');
+      const at = new Date().toISOString();
+      for (const [k, x] of Object.entries(results)) await db.doc('homework/' + k).set({ uploadedAt: at, rows: x.r.used, groupColumn: x.group, valueColumn: x.value, years: x.r.years });
+      input.value = ''; cols.hidden = true; tables = null;
+      say('Saved ' + Object.keys(results).map(k => HOMEWORK[k].name).join(', ') + '. The screens update in a few seconds.'); results = null;
     } catch (e) { say(e && e.code === 'invalid_argument' ? 'You don\'t have permission to upload reports.' : 'Saving failed. Try again.', true); btn.disabled = false; }
   });
   card._fill();
