@@ -1,0 +1,542 @@
+{
+ "screens/y7": {
+  "sotw": {
+   "weekOf": "2026-09-28",
+   "students": []
+  },
+  "notices": [
+   {
+    "id": "n1",
+    "title": "Netball Academy training",
+    "body": "Year 7 train on Wednesdays, 3:15 to 4:45pm.\nMeet in the girls' changing rooms and bring PE kit and trainers. Everyone welcome!",
+    "until": ""
+   }
+  ],
+  "celebrations": [
+   {
+    "id": "c1",
+    "title": "1st place at dance championship",
+    "caption": "",
+    "photo": ""
+   },
+   {
+    "id": "c2",
+    "title": "Masked Singer Fun Friday",
+    "caption": "",
+    "photo": ""
+   },
+   {
+    "id": "c3",
+    "title": "HYROX success in London",
+    "caption": "",
+    "photo": ""
+   },
+   {
+    "id": "c4",
+    "title": "Enterprise Champions at Plymouth Uni",
+    "caption": "",
+    "photo": ""
+   },
+   {
+    "id": "c5",
+    "title": "Careers Fair",
+    "caption": "",
+    "photo": ""
+   }
+  ],
+  "ticker": [
+   "Netball Academy: Year 7 train Wednesdays 3:15 to 4:45pm",
+   "House points are updated every Friday",
+   "every second counts"
+  ],
+  "housePoints": {
+   "Brunel": 21,
+   "Christie": 151,
+   "Darwin": 118,
+   "Fawcett": 41,
+   "Harrison": 171,
+   "Kitson": 100,
+   "Nearne": 254,
+   "Pengelly": 122
+  },
+  "slideSeconds": 12,
+  "updatedAt": "2026-10-02T12:00:00.000Z"
+ },
+ "screens/y7-left": {
+  "slideSeconds": 12,
+  "slides": [
+   {
+    "id": "ll-today",
+    "type": "list",
+    "hidden": false,
+    "title": "Today's Learning Legends",
+    "subtitle": "Learning Legends",
+    "items": "",
+    "emptyText": "None have been awarded yet today."
+   },
+   {
+    "id": "ll-yday",
+    "type": "list",
+    "hidden": false,
+    "title": "Yesterday's Learning Legends",
+    "subtitle": "Learning Legends",
+    "items": "",
+    "emptyText": ""
+   },
+   {
+    "id": "sx-maths",
+    "type": "stat",
+    "hidden": false,
+    "title": "Sparx Maths",
+    "metric": "% of class on 100%",
+    "unit": "%",
+    "values": {
+     "B": 89,
+     "C": 97,
+     "D": 96,
+     "F": 96,
+     "H": 85,
+     "K": 90,
+     "N": 84,
+     "P": 94
+    }
+   },
+   {
+    "id": "sx-maths-y",
+    "type": "breakdown",
+    "hidden": false,
+    "title": "Sparx Maths",
+    "metric": "Whole year",
+    "segments": [
+     {
+      "label": "On 100%",
+      "value": 91
+     },
+     {
+      "label": "75 to 100%",
+      "value": 1
+     },
+     {
+      "label": "Below 75%",
+      "value": 4
+     },
+     {
+      "label": "Not started",
+      "value": 4
+     }
+    ]
+   },
+   {
+    "id": "sx-sci",
+    "type": "breakdown",
+    "hidden": false,
+    "title": "Sparx Science",
+    "metric": "Whole year",
+    "segments": [
+     {
+      "label": "On 100%",
+      "value": 96
+     },
+     {
+      "label": "75 to 100%",
+      "value": 1.5
+     },
+     {
+      "label": "Below 75%",
+      "value": 1.5
+     },
+     {
+      "label": "Not started",
+      "value": 1
+     }
+    ]
+   },
+   {
+    "id": "sx-read",
+    "type": "stat",
+    "hidden": false,
+    "title": "Sparx Reader",
+    "metric": "Average score",
+    "unit": "",
+    "values": {
+     "B": 65,
+     "C": 120,
+     "D": 127,
+     "F": 73,
+     "H": 81,
+     "K": 88,
+     "N": 22,
+     "P": 90
+    }
+   },
+   {
+    "id": "sx-read-y",
+    "type": "breakdown",
+    "hidden": false,
+    "title": "Sparx Reader",
+    "metric": "Points this cycle",
+    "segments": [
+     {
+      "label": "300 plus",
+      "value": 17
+     },
+     {
+      "label": "150 to 299",
+      "value": 6
+     },
+     {
+      "label": "1 to 149",
+      "value": 12
+     },
+     {
+      "label": "0 points",
+      "value": 65
+     }
+    ]
+   },
+   {
+    "id": "tass",
+    "type": "stat",
+    "hidden": false,
+    "title": "Tassomai",
+    "metric": "Average score",
+    "unit": "",
+    "values": {
+     "B": 270,
+     "C": 375,
+     "D": 320,
+     "F": 195,
+     "H": 260,
+     "K": 280,
+     "N": 250,
+     "P": 252
+    }
+   },
+   {
+    "id": "tass-y",
+    "type": "breakdown",
+    "hidden": false,
+    "title": "Tassomai",
+    "metric": "Whole year",
+    "segments": [
+     {
+      "label": "500 plus",
+      "value": 24.9
+     },
+     {
+      "label": "300 to 499",
+      "value": 15.7
+     },
+     {
+      "label": "Less than 300",
+      "value": 37.4
+     },
+     {
+      "label": "Haven't started",
+      "value": 22.0
+     }
+    ]
+   },
+   {
+    "id": "helpzone",
+    "type": "list",
+    "hidden": false,
+    "title": "Helpzone \u00b7 D103",
+    "subtitle": "We do things properly. We never make excuses.",
+    "items": "",
+    "emptyText": ""
+   },
+   {
+    "id": "hp",
+    "type": "housepoints",
+    "hidden": false,
+    "title": "House points"
+   },
+   {
+    "id": "top-pts",
+    "type": "table",
+    "hidden": false,
+    "title": "Top performers",
+    "subtitle": "Points",
+    "rows": "Name\tTutor\tPoints"
+   },
+   {
+    "id": "top-acc",
+    "type": "table",
+    "hidden": false,
+    "title": "Top performers",
+    "subtitle": "Accuracy",
+    "rows": "Name\tTutor\tAccuracy"
+   },
+   {
+    "id": "effort",
+    "type": "info",
+    "hidden": false,
+    "title": "Your effort grade",
+    "body": "- 25% attendance: Based on your attendance in this cycle\n- 25% behaviour: Awarded in each subject by your teachers\n- 25% mindset: Awarded in each subject by your teachers\n- 25% homework: Awarded by your tutor\n\nYour effort grade is under your control. You can improve it by improving any of the four areas.\nEach cycle is a fresh start!"
+   }
+  ]
+ },
+ "screens/y7-right": {
+  "slideSeconds": 12,
+  "slides": [
+   {
+    "id": "bday",
+    "type": "birthdays",
+    "hidden": false,
+    "title": "Happy birthday!",
+    "people": ""
+   },
+   {
+    "id": "value",
+    "type": "value",
+    "hidden": false,
+    "title": "Value of the week",
+    "value": "Integrity",
+    "text": "We do the right thing, even when nobody is watching.",
+    "photo": ""
+   },
+   {
+    "id": "tidy-1",
+    "type": "poster",
+    "hidden": false,
+    "title": "Keep TA Tidy: recycling",
+    "photo": "media/keep-ta-tidy-recycle.gif"
+   },
+   {
+    "id": "tidy-2",
+    "type": "poster",
+    "hidden": false,
+    "title": "Keep TA Tidy: general waste",
+    "photo": "media/keep-ta-tidy-general.gif"
+   }
+  ]
+ },
+ "lessons/y7": {
+  "source": "sample",
+  "periods": {
+   "P1": [
+    {
+     "group": "7B",
+     "subject": "English",
+     "room": "E3"
+    },
+    {
+     "group": "7C",
+     "subject": "Maths",
+     "room": "M4"
+    },
+    {
+     "group": "7D",
+     "subject": "Science",
+     "room": "S2"
+    },
+    {
+     "group": "7F",
+     "subject": "Geography",
+     "room": "H5"
+    },
+    {
+     "group": "7H",
+     "subject": "PE",
+     "room": "Sports Hall"
+    },
+    {
+     "group": "7K",
+     "subject": "Art",
+     "room": "A1"
+    },
+    {
+     "group": "7N",
+     "subject": "French",
+     "room": "L2"
+    },
+    {
+     "group": "7P",
+     "subject": "Computing",
+     "room": "C1"
+    }
+   ],
+   "P2": [
+    {
+     "group": "7B",
+     "subject": "Maths",
+     "room": "M2"
+    },
+    {
+     "group": "7C",
+     "subject": "English",
+     "room": "E1"
+    },
+    {
+     "group": "7D",
+     "subject": "History",
+     "room": "H2"
+    },
+    {
+     "group": "7F",
+     "subject": "Science",
+     "room": "S4"
+    },
+    {
+     "group": "7H",
+     "subject": "Music",
+     "room": "MU1"
+    },
+    {
+     "group": "7K",
+     "subject": "Drama",
+     "room": "D1"
+    },
+    {
+     "group": "7N",
+     "subject": "PE",
+     "room": "Field"
+    },
+    {
+     "group": "7P",
+     "subject": "RE",
+     "room": "H6"
+    }
+   ],
+   "P3": [
+    {
+     "group": "7B",
+     "subject": "Science",
+     "room": "S1"
+    },
+    {
+     "group": "7C",
+     "subject": "French",
+     "room": "L1"
+    },
+    {
+     "group": "7D",
+     "subject": "English",
+     "room": "E2"
+    },
+    {
+     "group": "7F",
+     "subject": "Maths",
+     "room": "M3"
+    },
+    {
+     "group": "7H",
+     "subject": "Computing",
+     "room": "C2"
+    },
+    {
+     "group": "7K",
+     "subject": "Geography",
+     "room": "H5"
+    },
+    {
+     "group": "7N",
+     "subject": "Art",
+     "room": "A2"
+    },
+    {
+     "group": "7P",
+     "subject": "Design Tech",
+     "room": "T1"
+    }
+   ],
+   "P4": [
+    {
+     "group": "7B",
+     "subject": "History",
+     "room": "H1"
+    },
+    {
+     "group": "7C",
+     "subject": "Science",
+     "room": "S3"
+    },
+    {
+     "group": "7D",
+     "subject": "Maths",
+     "room": "M1"
+    },
+    {
+     "group": "7F",
+     "subject": "English",
+     "room": "E4"
+    },
+    {
+     "group": "7H",
+     "subject": "French",
+     "room": "L3"
+    },
+    {
+     "group": "7K",
+     "subject": "PE",
+     "room": "Sports Hall"
+    },
+    {
+     "group": "7N",
+     "subject": "Maths",
+     "room": "M5"
+    },
+    {
+     "group": "7P",
+     "subject": "Music",
+     "room": "MU1"
+    }
+   ],
+   "P5": [
+    {
+     "group": "7B",
+     "subject": "PE",
+     "room": "Field"
+    },
+    {
+     "group": "7C",
+     "subject": "Art",
+     "room": "A1"
+    },
+    {
+     "group": "7D",
+     "subject": "Computing",
+     "room": "C1"
+    },
+    {
+     "group": "7F",
+     "subject": "Drama",
+     "room": "D1"
+    },
+    {
+     "group": "7H",
+     "subject": "English",
+     "room": "E3"
+    },
+    {
+     "group": "7K",
+     "subject": "Maths",
+     "room": "M4"
+    },
+    {
+     "group": "7N",
+     "subject": "Science",
+     "room": "S2"
+    },
+    {
+     "group": "7P",
+     "subject": "History",
+     "room": "H2"
+    }
+   ]
+  }
+ },
+ "config/houses": {
+  "mascots": {
+   "B": "media/mascot-B.png",
+   "C": "media/mascot-C.png",
+   "D": "media/mascot-D.png",
+   "F": "media/mascot-F.png",
+   "H": "media/mascot-H.png",
+   "K": "media/mascot-K.png",
+   "N": "media/mascot-N.png",
+   "P": "media/mascot-P.png"
+  }
+ }
+}
