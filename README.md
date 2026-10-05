@@ -24,7 +24,7 @@ If `config.js` has no Supabase keys, the site runs in demo mode:
 - It shows sample Year 7 data.
 - You're treated as an admin.
 - Changes are saved in your own browser only.
-- Uploaded images last until the page reloads.
+- Uploaded images are kept in your browser too (large or many images may not fit).
 
 ## Going live
 

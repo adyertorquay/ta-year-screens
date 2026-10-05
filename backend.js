@@ -34,7 +34,8 @@
         profiles: async ids => Object.fromEntries([].concat(ids).map(i => [i, { id: i, name: i === 'demo' ? me.name : '', avatarUrl: avatar(''), isMe: i === 'demo', guest: false }])),
         search: async () => [],
       },
-      assets: { async upload(blob) { const id = 'demo-' + Math.random().toString(36).slice(2); blobs[id] = URL.createObjectURL(blob); return { id, url: blobs[id] }; } },
+      // Demo images are kept in the saved data itself (as data: URLs), so they survive a reload and show on other tabs.
+      assets: { async upload(blob) { const url = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); }); return { id: url, url }; } },
       blobUrl: async id => blobs[id] || '',
       reset() { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); },
     };
