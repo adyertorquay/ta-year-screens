@@ -943,6 +943,13 @@ function weekInfo(d) {
 }
 // "Teaching week 5", or the kind of week, e.g. "Assessment week".
 const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.teaching : '');
+// Students of the week are chosen on Fridays for the week after, so from Friday it moves on to the next school week.
+function sotwWeek(d = new Date()) {
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (day.getDay() === 5 || day.getDay() === 6 || day.getDay() === 0) day.setDate(day.getDate() + 7 - ((day.getDay() + 6) % 7));
+  const w = weekInfo(day); return w ? w.monday : isoDay(mondayOf(day));
+}
+const weekName = iso => { const w = WEEK_PLAN.find(x => x.monday === iso); return w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : ''; };
 // Lessons for the period about to start: from the A/B timetable when there is one, else the simple feed.
 function lessonRows(y, les, np) {
   const tt = store.timetable && store.timetable[y];
@@ -1404,12 +1411,16 @@ function viewEdit(y) {
       h('div', { class: 'wide' }, field('Why (one line)', 's-' + s.id + '-reason', s.reason, v => s.reason = v)),
       h('div', { class: 'tools' }, moveBtns(draft.sotw.students, i, renderS), removeBtn(draft.sotw.students, i, renderS)))) : [h('div', { class: 'empty', text: 'No students added this week.' })]));
     renderS();
+    // An empty list gets the coming week automatically (it is only saved if something else is saved).
+    if (!draft.sotw.students.length) draft.sotw.weekOf = sotwWeek();
+    const wkHint = h('span', { class: 'hint', style: 'margin:0', text: weekName(draft.sotw.weekOf) });
+    const wkField = field('Week beginning', 'sotw-week', draft.sotw.weekOf, v => { draft.sotw.weekOf = v; wkHint.textContent = weekName(v); }, 'date');
     form.append(h('fieldset', {}, h('legend', { text: 'Students of the week' }),
-      h('p', { class: 'hint', text: 'Up to six show on screen. First names and tutor group are enough.' }),
-      h('div', { style: 'max-width:240px;margin-bottom:12px' }, field('Week beginning', 'sotw-week', draft.sotw.weekOf, v => draft.sotw.weekOf = v, 'date')),
+      h('p', { class: 'hint', text: 'Up to six show on screen. First names and tutor group are enough. They are chosen on Fridays, so from Friday the week moves on to the next school week.' }),
+      h('div', { style: 'display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px' }, h('div', { style: 'width:240px' }, wkField), h('div', { style: 'padding-bottom:10px' }, wkHint)),
       sList, h('div', { style: 'margin-top:12px;display:flex;gap:8px;flex-wrap:wrap' },
         h('button', { class: 'btn', type: 'button', onclick: () => { draft.sotw.students.push({ id: uid(), name: '', group: '', reason: '' }); touch(); renderS(); }, text: 'Add student' }),
-        h('button', { class: 'btn ghost', type: 'button', onclick: () => { draft.sotw.students = []; draft.sotw.weekOf = todayISO(); $('#sotw-week').value = draft.sotw.weekOf; touch(); renderS(); }, text: 'Start a new week' }))));
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => { draft.sotw.students = []; draft.sotw.weekOf = sotwWeek(); $('#sotw-week').value = draft.sotw.weekOf; wkHint.textContent = weekName(draft.sotw.weekOf); touch(); renderS(); }, text: 'Start a new week' }))));
 
     // Notices
     const nList = h('div', { class: 'items' });
