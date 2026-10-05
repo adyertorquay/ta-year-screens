@@ -85,6 +85,24 @@ House points are read from an Arbor **live feed** (a report published as CSV or 
 
 If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
 
+## Homework reports (Sparx and Tassomai)
+
+Signed-in staff who can edit see a **Homework reports** section on the home page, with an upload for Sparx Maths, Sparx Reader, Sparx Science and Tassomai.
+
+1. Export the report from Sparx or Tassomai as Excel or CSV, with one row per student.
+2. Choose the file. The page guesses which column holds the tutor group (for example 7B or 11Q5) and which holds the completion, points or score. Change them in the drop-downs if needed. A summary for each year shows before anything is saved.
+3. Press Upload.
+
+The file is read in the browser. Only tutor group and whole-year totals are saved (`homework/sparx-maths` and so on), never student names.
+
+Race and breakdown slides use the upload automatically when their title starts with "Sparx Maths", "Sparx Reader", "Sparx Science" or "Tassomai". In the editor, "Numbers come from" on those slides can change this or switch back to typed-in numbers.
+
+| Upload | Race slide (per tutor group) | Breakdown slide (whole year) |
+|---|---|---|
+| Sparx Maths, Sparx Science | % of the class on 100% | On 100%, 75 to 99%, below 75%, not started |
+| Sparx Reader | Average points | 300 plus, 150 to 299, 1 to 149, 0 points |
+| Tassomai | Average score | 500 plus, 300 to 499, 1 to 299, not started |
+
 ## Timetable and term dates
 
 "Up next" shows every class in the year for the next period, from the Week A and Week B timetables. The week slide shows "Week B, Teaching week 5", "Assessment week" and so on by itself when its fields are left blank.
@@ -131,5 +149,6 @@ Both of these are set near the top of the script in `index.html`:
 | `supabase/schedule.sql` | Optional 10-minute house points refresh |
 | `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |
 | `tools/build_timetable.py` | Arbor timetable exports to `timetable.sql` |
+| `vendor/xlsx.full.min.js` | SheetJS, reads the homework exports in the browser |
 | `media/` | House mascots, Keep TA Tidy posters, logo |
 | `data/demo.json` | Demo-mode sample data |

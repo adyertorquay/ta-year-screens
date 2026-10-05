@@ -344,6 +344,26 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .groups-form > div, .seg { border-left: 6px solid var(--hc); padding-left: 8px; }
 .segs { display: grid; gap: 8px; }
 .seg { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end; }
+.hw { margin-top: 36px; }
+.hw-head h2 { font-size: 1.4rem; font-weight: 700; }
+.hw-head p { color: var(--muted); font-size: .92rem; margin-top: 4px; }
+.hw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.hw-card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.hw-card.fresh { border-left-color: var(--ok); }
+.hw-card.stale { border-left-color: var(--warn); }
+.hw-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.hw-top h3 { font-size: 1.15rem; font-weight: 700; }
+.hw-top .sub { color: var(--muted); font-size: .85rem; }
+.hw-card .pill { white-space: nowrap; color: var(--muted); }
+.hw-card.fresh .pill { color: var(--ok); }
+.hw-card.stale .pill { color: var(--warn); }
+.hw-card input[type=file] { width: 100%; min-width: 0; font-size: .88rem; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.hw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hw-cols select { width: 100%; min-width: 0; }
+.hw-out { font-size: .85rem; color: var(--muted); white-space: pre-line; }
+.hw-out.err { color: var(--warn); }
+.hw-card .btn.primary { align-self: flex-end; }
+@media (max-width: 760px) { .hw-grid { grid-template-columns: 1fr; } }
 .ycard .screens { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 6px; }
 .ycard .screens a { justify-content: center; padding-inline: 4px; min-width: 0; }
 @media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; } }
@@ -495,6 +515,7 @@ const listeners = new Set();
 function subscribe(y) {
   if (!db || subs[y]) return;
   if (!subs._hpall) subs._hpall = db.doc('housepoints/all').onSnapshot(s => { store.hp.all = s.exists ? s.data() : null; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('hp', e));
+  if (!subs._hw) subs._hw = Object.keys(HOMEWORK).map(k => db.doc('homework/' + k).onSnapshot(s => { store.homework[k] = s.exists ? s.data() : null; YEARS.forEach(emit); emit('homework'); }, e => console.warn('homework', e)));
   if (!subs._config) subs._config = db.doc('config/houses').onSnapshot(s => { store.mascots = s.exists ? (s.data().mascots || null) : null; YEARS.forEach(emit); }, e => console.warn('config', e));
   subs[y] = [
     ...['left', 'right'].map(side => db.doc('screens/' + y + '-' + side).onSnapshot(s => { store.screens[y + '-' + side] = s.exists ? s.data() : null; emit(y); }, e => console.warn('side', e))),
@@ -505,6 +526,151 @@ function subscribe(y) {
   ];
 }
 function emit(y) { for (const fn of listeners) fn(y); }
+const XLSX_SRC = 'vendor/xlsx.full.min.js';
+// ---------- homework uploads (Sparx and Tassomai exports) ----------
+// Staff upload the exports on the home page. The file is read in this browser and only tutor group and whole-year
+// totals are saved (homework/<kind>), never student names. Race and breakdown slides titled "Sparx Maths" etc. use them.
+const HOMEWORK = {
+  'sparx-maths': { name: 'Sparx Maths', what: 'completion', value: [/compuls/i, /complet/i, /% ?done|progress/i, /homework/i] },
+  'sparx-reader': { name: 'Sparx Reader', what: 'points', value: [/srp/i, /reading ?points/i, /points/i] },
+  'sparx-science': { name: 'Sparx Science', what: 'completion', value: [/compuls/i, /complet/i, /% ?done|progress/i, /homework/i] },
+  'tassomai': { name: 'Tassomai', what: 'score', value: [/score/i, /points/i, /daily goal/i, /quiz/i] },
+};
+const HW_BANDS = {
+  completion: { col: 'Completion column', metric: '% of class on 100%', unit: '%', bands: [['On 100%', v => v >= 100], ['75 to 99%', v => v >= 75], ['Below 75%', v => v > 0], ['Not started', () => true]] },
+  points: { col: 'Points column', metric: 'Average points', unit: '', bands: [['300 plus', v => v >= 300], ['150 to 299', v => v >= 150], ['1 to 149', v => v > 0], ['0 points', () => true]] },
+  score: { col: 'Score column', metric: 'Average score', unit: '', bands: [['500 plus', v => v >= 500], ['300 to 499', v => v >= 300], ['1 to 299', v => v > 0], ['Not started', () => true]] },
+};
+store.homework = {};
+// Which upload a slide reads: chosen in the editor, or guessed from its title.
+const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWORK).find(([, k]) => new RegExp('^\\s*' + k.name + '\\b', 'i').test(s.title || '')) || [''])[0];
+function hwSlide(y, s) {
+  if (s.type !== 'stat' && s.type !== 'breakdown') return s;
+  const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
+  if (!yd) return s;
+  const b = HW_BANDS[HOMEWORK[kind].what];
+  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, metric: b.metric, unit: b.unit })
+    : Object.assign({}, s, { segments: yd.breakdown, metric: 'Whole year' });
+}
+const agoText = iso => { const m = Math.max(0, (Date.now() - Date.parse(iso)) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 60 * 24 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+let xlsxLib = null;
+const loadXLSX = () => xlsxLib || (xlsxLib = new Promise((ok, no) => {
+  if (window.XLSX) return ok(window.XLSX);
+  const sc = document.createElement('script'); sc.src = XLSX_SRC;
+  sc.onload = () => ok(window.XLSX); sc.onerror = () => { xlsxLib = null; no(new Error('The spreadsheet reader did not load. Check the connection and try again.')); };
+  document.head.append(sc);
+}));
+// The biggest sheet; its header is the first row with at least three filled cells.
+async function readSheet(file) {
+  const X = await loadXLSX();
+  const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+  let best = [];
+  for (const n of wb.SheetNames) { const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: true }); if (rows.length > best.length) best = rows; }
+  const hi = best.findIndex(r => r.filter(c => String(c).trim()).length >= 3);
+  if (hi < 0) throw new Error('No table was found in that file.');
+  return { head: best[hi].map((c, i) => String(c).trim() || 'Column ' + (i + 1)), rows: best.slice(hi + 1).filter(r => r.some(c => String(c).trim())) };
+}
+const GROUP_RX = /(?:^|[^0-9])(7|8|9|10|11)\s?([A-Z]{1,2}\d?)(?![A-Za-z])/i;
+const toNum = x => {
+  if (typeof x === 'number') return x;
+  const t = String(x ?? '').trim();
+  if (!t) return null;
+  if (/^(complete|completed|done|yes)$/i.test(t)) return 100;
+  if (/^(not started|none|no|-)$/i.test(t)) return 0;
+  const m = t.replace(/,/g, '').match(/^-?\d+(\.\d+)?/); return m ? +m[0] : null;
+};
+function guessCols(t, kind) {
+  const sample = i => t.rows.slice(0, 300).map(r => r[i]).filter(v => String(v ?? '').trim());
+  const share = (i, f) => { const s = sample(i); return s.length ? s.filter(f).length / s.length : 0; };
+  const groupish = i => share(i, v => GROUP_RX.test(String(v))) > 0.6, numeric = i => share(i, v => toNum(v) != null) > 0.6;
+  let g = t.head.findIndex((x, i) => /tutor|form|reg/i.test(x) && groupish(i));
+  if (g < 0) g = t.head.findIndex((x, i) => /group|class/i.test(x) && groupish(i));
+  if (g < 0) g = t.head.findIndex((x, i) => groupish(i));
+  let v = -1;
+  for (const rx of HOMEWORK[kind].value) if (v < 0) v = t.head.findIndex((x, i) => i !== g && rx.test(x) && numeric(i));
+  if (v < 0) v = t.head.findIndex((x, i) => i !== g && numeric(i) && !/id|upn|year/i.test(x));
+  return { g, v };
+}
+const round1 = v => Math.round(v * 10) / 10;
+function summarise(t, kind, g, v) {
+  const b = HW_BANDS[HOMEWORK[kind].what];
+  const vals = t.rows.map(r => ({ grp: String(r[g] ?? ''), v: toNum(r[v]) }));
+  if (b.unit === '%') { // Excel percentages arrive as 0 to 1
+    const nums = vals.map(x => x.v).filter(x => x != null);
+    if (nums.length && nums.every(x => x <= 1) && nums.some(x => x > 0 && x < 1)) vals.forEach(x => { if (x.v != null) x.v *= 100; });
+  }
+  const years = {}; let used = 0;
+  for (const x of vals) {
+    const m = x.grp.match(GROUP_RX); if (!m) continue;
+    const y = 'y' + m[1], L = m[2].toUpperCase(), val = x.v || 0;
+    const Y = years[y] = years[y] || { n: 0, sum: 0, band: b.bands.map(() => 0), groups: {} };
+    Y.n++; Y.sum += val; used++; Y.band[b.bands.findIndex(([, f]) => f(val))]++;
+    const G = Y.groups[L] = Y.groups[L] || { n: 0, sum: 0, top: 0 }; G.n++; G.sum += val; if (b.bands[0][1](val)) G.top++;
+  }
+  const out = {};
+  for (const [y, Y] of Object.entries(years)) out[y] = { students: Y.n, average: Math.round(Y.sum / Y.n),
+    groups: Object.fromEntries(Object.entries(Y.groups).map(([L, G]) => [L, b.unit === '%' ? round1(G.top / G.n * 100) : Math.round(G.sum / G.n)])),
+    breakdown: b.bands.map(([label], k) => ({ label, value: round1(Y.band[k] / Y.n * 100) })) };
+  return { years: out, used, skipped: t.rows.length - used };
+}
+function homeworkPanel() {
+  return h('section', { class: 'hw' },
+    h('div', { class: 'hw-head' }, h('h2', { text: 'Homework reports' }),
+      h('p', { text: 'Upload the latest Sparx and Tassomai exports to update the homework slides on every screen. Only tutor group and year totals are saved, never student names.' })),
+    h('div', { class: 'hw-grid' }, Object.keys(HOMEWORK).map(hwCard)));
+}
+function hwCard(kind) {
+  const k = HOMEWORK[kind], b = HW_BANDS[k.what];
+  const pill = h('span', { class: 'pill' });
+  const input = h('input', { type: 'file', accept: '.xlsx,.xls,.csv', 'aria-label': k.name + ' export file' });
+  const gSel = h('select'), vSel = h('select');
+  const cols = h('div', { class: 'hw-cols' }, h('label', { class: 'f' }, 'Tutor group column', gSel), h('label', { class: 'f' }, b.col, vSel));
+  cols.hidden = true;
+  const out = h('div', { class: 'hw-out' });
+  const btn = h('button', { class: 'btn primary', type: 'button', text: 'Upload', disabled: true });
+  const card = h('div', { class: 'hw-card' }, h('div', { class: 'hw-top' }, h('div', {}, h('h3', { text: k.name }), h('div', { class: 'sub', text: 'Export file, .xlsx or .csv' })), pill), input, cols, out, btn);
+  let table = null, result = null;
+  card._fill = () => {
+    const d = store.homework[kind], when = d && d.uploadedAt;
+    pill.textContent = when ? 'Uploaded ' + agoText(when) : 'Not uploaded yet';
+    card.classList.toggle('fresh', !!when && Date.now() - Date.parse(when) < 864e5);
+    card.classList.toggle('stale', !!when && Date.now() - Date.parse(when) >= 864e5);
+  };
+  const say = (text, err) => { out.textContent = text; out.classList.toggle('err', !!err); };
+  const preview = () => {
+    result = null; btn.disabled = true;
+    const g = +gSel.value, v = +vSel.value;
+    if (g < 0 || v < 0) return say('Choose the tutor group column and the ' + b.col.toLowerCase() + '.', true);
+    const r = summarise(table, kind, g, v);
+    if (!r.used) return say('No tutor groups like 7B or 11Q5 were found in "' + table.head[g] + '".', true);
+    const lines = YEARS.filter(y => r.years[y]).map(y => { const Y = r.years[y], top = Y.breakdown[0];
+      return yearName(y) + ': ' + Y.students + ' students, ' + (b.unit === '%' ? fmtNum(top.value) + '% on 100%' : 'average ' + fmtNum(Y.average)); });
+    if (r.skipped) lines.push(r.skipped + ' row' + (r.skipped === 1 ? '' : 's') + ' had no tutor group and ' + (r.skipped === 1 ? 'was' : 'were') + ' left out.');
+    say(lines.join('\n')); result = r; btn.disabled = false;
+  };
+  input.addEventListener('change', async () => {
+    table = null; result = null; btn.disabled = true; cols.hidden = true;
+    const f = input.files && input.files[0]; if (!f) return say('');
+    say('Reading ' + f.name + '…');
+    try { table = await readSheet(f); } catch (e) { return say(e.message || 'That file could not be read.', true); }
+    const opts = sel => sel.replaceChildren(h('option', { value: -1, text: 'Choose…' }), ...table.head.map((x, i) => h('option', { value: i, text: x })));
+    opts(gSel); opts(vSel);
+    const guess = guessCols(table, kind); gSel.value = guess.g; vSel.value = guess.v;
+    cols.hidden = false; preview();
+  });
+  gSel.addEventListener('change', preview); vSel.addEventListener('change', preview);
+  btn.addEventListener('click', async () => {
+    if (!result) return;
+    btn.disabled = true; const was = out.textContent; say('Saving…');
+    try {
+      await db.doc('homework/' + kind).set({ uploadedAt: new Date().toISOString(), rows: result.used, groupColumn: table.head[+gSel.value], valueColumn: table.head[+vSel.value], years: result.years });
+      input.value = ''; cols.hidden = true; table = null; result = null; say('Saved. The screens update in a few seconds.');
+    } catch (e) { say(e && e.code === 'invalid_argument' ? 'You don\'t have permission to upload reports.' : 'Saving failed. Try again.', true); btn.disabled = false; }
+  });
+  card._fill();
+  return card;
+}
 
 // ---------- staff sign-in ----------
 // Accounts live in Supabase (backend.js). Roles in screen_staff: viewer (TVs, read only), editor (their years), admin (all,
@@ -940,7 +1106,7 @@ class PortraitStage {
   }
   destroy() { clearInterval(this.timer); this.ro.disconnect(); this.fit.remove(); }
   setData(sideDoc, centreDoc, les) {
-    this.data = normalSide(sideDoc); this.centre = normal(centreDoc); this.les = les || null;
+    this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => hwSlide(this.year, x)) }); this.centre = normal(centreDoc); this.les = les || null;
     this.buildSlides(); this.renderNext(true);
   }
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
@@ -1107,7 +1273,9 @@ function viewHome() {
       h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#login', text: 'Edit screens' }), themeBtn())),
     h('div', { class: 'years' }, cards)));
   YEARS.forEach(subscribe);
-  const fn = () => cards.forEach(c => c._fill());
+  let hwCards = [];
+  access().then(a => { if (a.state !== 'ok' || !app.querySelector('.years')) return; const p = homeworkPanel(); hwCards = [...p.querySelectorAll('.hw-card')]; app.querySelector('.wrap').append(p); }).catch(() => {});
+  const fn = () => { cards.forEach(c => c._fill()); hwCards.forEach(c => c._fill && c._fill()); };
   listeners.add(fn); cleanup = () => listeners.delete(fn);
 }
 
@@ -1368,6 +1536,16 @@ function viewEditSide(y, side) {
       s.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { s.photo = ''; touch(); rerender(); }, text: 'Remove image' }) : null);
   }
 
+  // Race and breakdown slides can take their numbers from a homework upload instead of the boxes below.
+  function hwSourceRow(s, render) {
+    const id = 'sl-' + s.id + '-src', cur = hwSource(s);
+    const sel = h('select', { id }, h('option', { value: '', text: 'Typed in below' }), Object.entries(HOMEWORK).map(([k, v]) => h('option', { value: k, text: v.name + ' upload' })));
+    sel.value = cur;
+    const d = cur && store.homework[cur];
+    const note = h('p', { class: 'hint', text: !cur ? '' : d && d.uploadedAt ? 'Using the ' + HOMEWORK[cur].name + ' upload from ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.' : 'No ' + HOMEWORK[cur].name + ' upload yet, so the boxes below are shown. Upload it on the home page.' });
+    sel.addEventListener('change', () => { s.source = sel.value; touch(); render(); });
+    return h('div', { class: 'wide' }, h('label', { class: 'f', for: id }, 'Numbers come from', sel), note);
+  }
   function slideCard(s, i, render) {
     const t = SLIDE_TYPES[s.type] || { label: s.type, hint: '' };
     const F = (label, k, type = 'text', extra = {}, wide = false) => { const f = field(label, 'sl-' + s.id + '-' + k, s[k], v => s[k] = v, type, extra); return wide ? h('div', { class: 'wide' }, f) : f; };
@@ -1375,11 +1553,11 @@ function viewEditSide(y, side) {
     switch (s.type) {
       case 'list': body.append(F('Title', 'title', 'text', {}, true), F('Small heading (optional)', 'subtitle', 'text', {}, true),
         F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true)); break;
-      case 'stat': body.append(F('Title', 'title'), F('What the number means', 'metric'), F('Unit (e.g. %)', 'unit'),
+      case 'stat': body.append(hwSourceRow(s, render), F('Title', 'title'), F('What the number means', 'metric'), F('Unit (e.g. %)', 'unit'),
         h('div', { class: 'wide groups-form' }, groupsOf(store.screens[y]).map(L => h('div', { style: '--hc:' + suffixColor(L) },
           field(y.slice(1) + L, 'sl-' + s.id + '-v' + L, (s.values || {})[L] ?? '', v => { s.values = s.values || {}; s.values[L] = v; }, 'number', { step: 'any', inputmode: 'decimal' }))))); break;
       case 'breakdown': {
-        body.append(F('Title', 'title'), F('What it shows', 'metric'));
+        body.append(hwSourceRow(s, render), F('Title', 'title'), F('What it shows', 'metric'));
         const box = h('div', { class: 'wide segs' });
         const rs = () => box.replaceChildren(...s.segments.map((x, k) => h('div', { class: 'seg', style: '--hc:' + SEG[k % SEG.length] },
           field('Part ' + (k + 1), 'sl-' + s.id + '-sl' + k, x.label, v => x.label = v), field('%', 'sl-' + s.id + '-sv' + k, x.value, v => x.value = v, 'number', { step: 'any', inputmode: 'decimal' }),

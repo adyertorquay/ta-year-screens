@@ -43,14 +43,15 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- May the signed-in person write this document?
---   admins: anything.  editors: screens/<year> and screens/<year>-left|right for their years.
+--   admins: anything.  editors: screens/<year> and screens/<year>-left|right for their years, and the
+--   homework/<kind> totals uploaded on the home page (Sparx and Tassomai).
 create or replace function public.screen_can_write(doc_path text) returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce((
     select case
       when s.role = 'admin' then true
-      when s.role = 'editor' then doc_path like 'screens/%'
-        and ('all' = any (s.years) or split_part(split_part(doc_path, '/', 2), '-', 1) = any (s.years))
+      when s.role = 'editor' then doc_path like 'homework/%' or (doc_path like 'screens/%'
+        and ('all' = any (s.years) or split_part(split_part(doc_path, '/', 2), '-', 1) = any (s.years)))
       else false end
     from public.screen_staff s where s.user_id = auth.uid()
   ), false)
