@@ -917,7 +917,7 @@ function viewLogin(a, want) {
       h('p', { text: 'You can edit screens, but you haven\'t been added to a year team yet. Ask the screens administrator to add you.' })];
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
-      h('div', { class: 'years-go' }, a.years.map(editLink), h('a', { class: 'btn', href: '#homework', text: 'Homework uploads' })),
+      h('div', { class: 'years-go' }, a.years.map(editLink), h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1479,7 +1479,7 @@ function viewHome() {
 function viewHomework() {
   const body = h('div', {}, h('p', { class: 'hint', text: 'Checking your sign-in…' }));
   app.append(h('div', { class: 'wrap' },
-    h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Homework uploads' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
+    h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Homework' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
       h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn', href: '#', text: 'Back' }), themeBtn())),
     body));
   YEARS.forEach(subscribe);
