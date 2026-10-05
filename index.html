@@ -1642,9 +1642,7 @@ function viewEdit(y) {
 
     // Settings
     form.append(h('fieldset', {}, h('legend', { text: 'Screen settings' }),
-      h('div', { style: 'max-width:240px' }, field('Seconds per slide', 'secs', draft.slideSeconds, v => draft.slideSeconds = v, 'number', { min: 5, max: 60 })),
-      field('Tutor groups (leave blank if they are named after houses, like 7B and 7C)', 'groups', (draft.groups || []).join(', '), v => { draft.groups = v.split(/[\s,]+/).map(x => x.trim().replace(/^\d{1,2}/, '')).filter(Boolean); }),
-      h('p', { class: 'hint', text: 'Used by the tutor group race slides on the side screens. Write the letters and numbers after the year, e.g. Q5, Q6, T4.' })));
+      h('div', { style: 'max-width:240px' }, field('Seconds per slide', 'secs', draft.slideSeconds, v => draft.slideSeconds = v, 'number', { min: 5, max: 60 }))));
 
     if (readOnly) form.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
   }
