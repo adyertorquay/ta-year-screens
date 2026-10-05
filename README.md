@@ -96,7 +96,12 @@ The "Up next" panel reads the `screen_docs` row `lessons/y7` (one per year), in 
 
 A scheduled job holding the Supabase **service role** key (never put that key in this site) can fill these rows from Arbor before each period.
 
-Bell times are set in `BELLS` near the top of the script in `index.html`. They are placeholders and should be checked against the real school day.
+## Bell times and timed messages
+
+Both of these are set near the top of the script in `index.html`:
+
+- **`BELLS`**: period start times, taken from the school day timetable (P1 08:25 to P5 15:15). "Up next" uses them.
+- **`TAKEOVERS`**: full-screen messages that every TV shows on weekdays. At the moment it holds one message, "Go To Line Up 1", at 08:15 for 2 minutes. Add a line to include another, for example `{ at: '09:05', minutes: 2, text: 'Go To Line Up 2' }`.
 
 ## Files
 

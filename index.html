@@ -222,6 +222,14 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 .band { display: grid; grid-template-columns: repeat(8, 1fr); }
 .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--tv-ink); font-size: 22px; padding: 24px; }
+.takeover { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vmin; text-align: center; padding: 6vmin;
+  background: radial-gradient(circle at 50% 40%, #b0245f, #8A1A4D 45%, #4a0d29 100%); color: #fff; animation: to-in .5s ease-out; }
+.takeover .ta-logo { height: 18vmin; filter: invert(1); }
+.to-text { font-family: var(--display); font-weight: 700; font-size: 13vmin; line-height: 1; letter-spacing: -.02em; max-width: 16ch; text-wrap: balance; animation: to-pulse 2s ease-in-out infinite; }
+.to-sub { font-weight: 600; font-size: 2.6vmin; letter-spacing: .22em; text-transform: uppercase; color: #EBA7BE; }
+@keyframes to-in { from { opacity: 0; transform: scale(1.04); } }
+@keyframes to-pulse { 50% { transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) { .takeover, .to-text { animation: none; } }
 .tvctl { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; display: flex; gap: 8px; z-index: 10; transition: opacity .4s; }
 .tvctl a, .tvctl button { background: rgba(36,16,25,.85); color: #F7EEF1; border: 1px solid #3a2029; border-radius: 8px; padding: 8px 12px; font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; }
 .tvctl.idle { opacity: 0; pointer-events: none; }
@@ -357,11 +365,21 @@ const HOUSES = [
 ];
 const HC = HOUSES.map(h => h[1]);
 // School day. Arbor holds the real bell times; these are placeholders until the sync is built.
+// The school day (from the school's timetable, 2026-27).
 const BELLS = [
-  { p: 'P1', label: 'Period 1', start: '08:50' }, { p: 'P2', label: 'Period 2', start: '09:50' },
-  { p: 'P3', label: 'Period 3', start: '11:10' }, { p: 'P4', label: 'Period 4', start: '12:10' },
-  { p: 'P5', label: 'Period 5', start: '13:55' },
+  { p: 'P1', label: 'Period 1', start: '08:25' }, { p: 'P2', label: 'Period 2', start: '09:15' },
+  { p: 'P3', label: 'Period 3', start: '11:25' }, { p: 'P4', label: 'Period 4', start: '13:35' },
+  { p: 'P5', label: 'Period 5', start: '15:15' },
 ];
+// Full-screen messages every TV shows at set times on school days (Monday to Friday), for `minutes` minutes.
+const TAKEOVERS = [
+  { at: '08:15', minutes: 2, text: 'Go To Line Up 1' },
+];
+function activeTakeover(now = new Date()) {
+  const wd = now.getDay(); if (wd < 1 || wd > 5) return null;
+  const m = now.getHours() * 60 + now.getMinutes();
+  return TAKEOVERS.find(t => m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
+}
 const MOTTO = 'every second counts';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1041,12 +1059,21 @@ function viewScreen(y, side) {
     else stage.setData(store.screens[y], store.lessons[y]);
   };
   listeners.add(fill); subscribe(y); fill();
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  app.append(takeover);
+  let shown = null;
+  const checkTakeover = () => {
+    const t = activeTakeover();
+    if (t === shown) return; shown = t;
+    takeover.hidden = !t; if (t) $('.to-text', takeover).textContent = t.text;
+  };
+  checkTakeover(); const toTimer = setInterval(checkTakeover, 1000);
   let lock = null;
   async function goFull() {
     try { await document.documentElement.requestFullscreen(); } catch (e) { /* not available here */ }
     try { lock = await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
   }
-  cleanup = () => { listeners.delete(fill); stage.destroy(); document.removeEventListener('pointermove', wake); clearTimeout(idleT); try { lock && lock.release(); } catch (e) {} };
+  cleanup = () => { clearInterval(toTimer); takeover.remove(); listeners.delete(fill); stage.destroy(); document.removeEventListener('pointermove', wake); clearTimeout(idleT); try { lock && lock.release(); } catch (e) {} };
 }
 
 function viewEdit(y) {
