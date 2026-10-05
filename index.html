@@ -307,6 +307,7 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .wk-w { font-family: var(--display); font-weight: 700; font-size: 220px; letter-spacing: -.03em; }
 .wk-l { font-family: var(--display); font-weight: 700; font-size: 520px; color: var(--rose); letter-spacing: -.04em; }
 .wk-t { font-size: 64px; font-weight: 600; color: var(--tv-dim); margin-top: 40px; }
+.wk-t.solo { font-size: 120px; color: var(--tv-ink); font-weight: 800; text-align: center; margin-top: 4vmin; }
 .value-word { font-family: var(--display); font-weight: 700; font-size: 168px; line-height: .95; letter-spacing: -.03em; color: var(--rose); overflow-wrap: anywhere; }
 .value-img { width: 100%; max-height: 640px; object-fit: contain; border-radius: 18px; }
 .p-poster { background: #000; }
@@ -440,7 +441,7 @@ const SLIDE_TYPES = {
   info: { label: 'Information', hint: 'Lines starting with "- " become bullets. "- 25% Attendance: detail" becomes a big tile.' },
   housepoints: { label: 'House points', hint: 'Shows the house points entered on the centre screen.' },
   sotw: { label: 'Students of the week', hint: 'Shows the students entered on the centre screen.' },
-  week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Worked out automatically from the term dates.' },
+  week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Worked out automatically from the school week plan.' },
 };
 const SLIDE_DEFAULTS = {
   list: { title: '', subtitle: '', items: '', emptyText: '' },
@@ -661,39 +662,65 @@ function viewStaff() {
 
 // ---------- next lesson logic ----------
 // ---------- school calendar 2026-27 ----------
-// Term dates from the school. Week A/B alternates every school week (holiday weeks don't count); the week of
-// Monday 5 October 2026 is Week B. Teaching weeks are numbered from each term's first full week.
+// Term dates from the school, for which days are school days.
 const TERMS = [['2026-09-03', '2026-10-23'], ['2026-11-02', '2026-12-18'], ['2027-01-04', '2027-02-12'],
   ['2027-02-22', '2027-03-25'], ['2027-04-12', '2027-05-28'], ['2027-06-07', '2027-07-16']];
-const TERM_GROUPS = [[0, 1], [2, 3], [4, 5]]; // Autumn, Spring, Summer
 const NON_PUPIL_DAYS = new Set(['2027-07-02', '2027-07-05']);
-const WEEK_ANCHOR = { monday: '2026-10-05', letter: 'B' };
+// The school's week plan, copied from its calendar: Monday, timetable week (A, B or - for none), week number,
+// and what kind of week it is when it isn't a normal teaching week. Holiday weeks are simply left out.
+const WEEK_PLAN = `
+2026-08-31 A - TA Way
+2026-09-07 B 1
+2026-09-14 A 2
+2026-09-21 B 3
+2026-09-28 A 4
+2026-10-05 B 5
+2026-10-12 A 6
+2026-10-19 B 7
+2026-11-02 A 8
+2026-11-09 B 1 Assessment week
+2026-11-16 A 1 Super Teaching week
+2026-11-23 B 1
+2026-11-30 A 2
+2026-12-07 B 3
+2026-12-14 A 4
+2027-01-04 B 5
+2027-01-11 A 6
+2027-01-18 B 7
+2027-01-25 A 1 Assessment week
+2027-02-01 B 1 Super Teaching week
+2027-02-08 A 1
+2027-02-22 B 2
+2027-03-01 A 3
+2027-03-08 B 4
+2027-03-15 A 5
+2027-03-22 B 6
+2027-04-12 A 7
+2027-04-19 B 1 Assessment week
+2027-04-26 A 1 Super Teaching week
+2027-05-03 B 1
+2027-05-10 A 2
+2027-05-17 B 3
+2027-05-24 A 4
+2027-06-07 B 5
+2027-06-14 A 6
+2027-06-21 B 7
+2027-06-28 A 1 Synoptic Assessment week
+2027-07-05 B 1 Super Teaching week
+2027-07-12 - - Activities Week
+`.trim().split('\n').map(l => { const [monday, letter, n, ...rest] = l.trim().split(/\s+/);
+  return { monday, letter: letter === '-' ? '' : letter, teaching: n === '-' ? null : +n, label: rest.join(' ') }; });
 const isoDay = d => todayISO(d);
 const mondayOf = d => { const m = new Date(d.getFullYear(), d.getMonth(), d.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; };
 const termIndex = d => { const k = isoDay(d); return TERMS.findIndex(([a, b]) => k >= a && k <= b); };
 const isSchoolDay = d => d.getDay() >= 1 && d.getDay() <= 5 && termIndex(d) >= 0 && !NON_PUPIL_DAYS.has(isoDay(d));
-const SCHOOL_WEEKS = (() => { // Mondays of every week with at least one term day, in order
-  const out = [];
-  for (const [a, end] of TERMS) {
-    for (let m = mondayOf(new Date(a + 'T12:00:00')); isoDay(m) <= end; m.setDate(m.getDate() + 7)) {
-      const k = isoDay(m); if (!out.includes(k)) out.push(k);
-    }
-  }
-  return out;
-})();
-// Week letter and teaching week for a date. Outside term it gives the week school returns in.
+// The week a date falls in. In a holiday it gives the week school returns in.
 function weekInfo(d) {
-  const i = SCHOOL_WEEKS.findIndex(k => k >= isoDay(mondayOf(d)));
-  if (i < 0) return null;
-  const wk = SCHOOL_WEEKS[i];
-  const flip = (i - SCHOOL_WEEKS.indexOf(WEEK_ANCHOR.monday)) % 2 !== 0;
-  const letter = flip ? (WEEK_ANCHOR.letter === 'A' ? 'B' : 'A') : WEEK_ANCHOR.letter;
-  const fri = new Date(wk + 'T12:00:00'); fri.setDate(fri.getDate() + 4);
-  const g = TERM_GROUPS.find(([f, l]) => isoDay(fri) >= TERMS[f][0] && wk <= TERMS[l][1]);
-  let teaching = null;
-  if (g) { const fullStart = SCHOOL_WEEKS.find(k => k >= TERMS[g[0]][0]); if (wk >= fullStart) teaching = SCHOOL_WEEKS.filter(k => k >= fullStart && k <= wk).length; }
-  return { letter, teaching, monday: wk };
+  const k = isoDay(mondayOf(d));
+  return WEEK_PLAN.find(w => w.monday >= k) || null;
 }
+// "Teaching week 5", or the kind of week, e.g. "Assessment week".
+const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.teaching : '');
 // Lessons for the period about to start: from the A/B timetable when there is one, else the simple feed.
 function lessonRows(y, les, np) {
   const tt = store.timetable && store.timetable[y];
@@ -702,7 +729,7 @@ function lessonRows(y, les, np) {
 }
 function lessonSource(y, les, np) {
   const tt = store.timetable && store.timetable[y];
-  if (tt && tt.weeks) { const w = weekInfo(np.date); return w ? 'Week ' + w.letter + ' timetable' : ''; }
+  if (tt && tt.weeks) { const w = weekInfo(np.date); return w && w.letter ? 'Week ' + w.letter + ' timetable' : ''; }
   return !les ? '' : les.source === 'arbor' ? 'From Arbor' + (les.syncedAt ? ', updated ' + new Date(les.syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sample timetable. Arbor will supply this.';
 }
 const hasLessons = (y, les) => !!(les || (store.timetable && store.timetable[y]));
@@ -974,10 +1001,10 @@ class PortraitStage {
           s.photo ? h('img', { class: 'value-img', src: photoUrl(s.photo), alt: '' }) : null, s.text ? h('p', { class: 'info-p', text: s.text }) : null));
       case 'week': {
         const auto = weekInfo(new Date()) || {};
-        const letter = s.week || auto.letter || '', tw = s.week ? s.teachingWeek : auto.teaching;
+        const letter = s.week || auto.letter || '', line = s.week ? (s.teachingWeek ? 'Teaching week ' + s.teachingWeek : '') : weekLine(auto);
         return wrap('p-week', pad(h('div', { class: 's-eyebrow', text: s.title || VALUES_LINE }),
-          h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: letter })),
-          tw ? h('div', { class: 'wk-t', text: 'Teaching week ' + tw }) : null));
+          letter ? h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: letter })) : null,
+          line ? h('div', { class: 'wk-t' + (letter ? '' : ' solo'), text: line }) : null));
       }
       case 'poster':
         return wrap('p-poster', s.photo ? h('img', { src: photoUrl(s.photo), alt: s.title || '' }) : pad(h('div', { class: 'p-empty', text: 'Add an image for this poster.' })));
@@ -1370,7 +1397,7 @@ function viewEditSide(y, side) {
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
-      case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the term dates (this week: ' + (w => w ? 'Week ' + w.letter + (w.teaching ? ', teaching week ' + w.teaching : '') : 'outside term')(weekInfo(new Date())) + '). Fill these in only to override it.' }), F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
+      case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school week plan (this week: ' + (w => w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : 'no school weeks left in the plan')(weekInfo(new Date())) + '). Fill these in only to override it.' }), F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
       case 'housepoints': body.append(F('Title', 'title', 'text', {}, true)); break;
     }
     const showId = 'sl-' + s.id + '-show';

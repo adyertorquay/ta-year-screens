@@ -87,14 +87,12 @@ If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `
 
 ## Timetable and term dates
 
-"Up next" shows every class in the year for the next period, from the Week A and Week B timetables. The week slide works out "Week A/B, teaching week N" by itself when its fields are left blank.
+"Up next" shows every class in the year for the next period, from the Week A and Week B timetables. The week slide shows "Week B, Teaching week 5", "Assessment week" and so on by itself when its fields are left blank.
 
-**Which week it is** comes from the term dates near the top of the script in `index.html`:
+**Which week it is** comes from two lists near the top of the script in `index.html`:
 
-- **`TERMS`**: the first and last day of each term and half term (2026-27 at the moment). Add next year's dates before September.
-- **`NON_PUPIL_DAYS`**: single days off inside a term.
-- **`WEEK_ANCHOR`**: one Monday whose letter is known (Monday 5 October 2026 is Week B). Weeks then alternate A and B, skipping holiday weeks.
-- Teaching weeks restart at 1 at the start of each term (Autumn, Spring, Summer), counting from the first full week, and carry on through half term.
+- **`WEEK_PLAN`**: the school's week plan, one line per week: the Monday, A or B, the week number, and the kind of week when it isn't normal teaching (for example `2026-11-09 B 1 Assessment week`). Holiday weeks are left out, and in a holiday the screens show the week school returns in. Copy in next year's plan before September.
+- **`TERMS`** and **`NON_PUPIL_DAYS`**: the term dates, used to tell which days are school days.
 
 **Updating the timetable** (for example in September):
 
