@@ -17,14 +17,6 @@ It's a static site (no build step), hosted on Vercel, with data and sign-in in i
 
 These work the same way for `y8` to `y11`.
 
-## Site login
-
-Every page, TVs included, first asks for one shared username and password (`middleware.js`, run by Vercel). Set them in Vercel under Settings, then Environment Variables, as `SITE_USERNAME` and `SITE_PASSWORD`, then redeploy. Never put them in this repo. Until both are set, the site shows a "not set up yet" page.
-
-A correct login is remembered on that browser for a year, so each TV signs in once. Changing either value signs everyone out. `/logout` signs the current browser out. `/api/` is not behind it, because the scheduled sync has its own secret.
-
-This only keeps the site private. Once Supabase is set up, each person's own account (below) decides who can edit which year.
-
 ## Demo mode
 
 If `config.js` has no Supabase keys, the site runs in demo mode:
