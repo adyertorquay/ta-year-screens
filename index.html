@@ -815,7 +815,7 @@ function viewLogin(a, want) {
       h('p', { text: 'You can edit screens, but you haven\'t been added to a year team yet. Ask the screens administrator to add you.' })];
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
-      h('div', { class: 'years-go' }, a.years.map(editLink)),
+      h('div', { class: 'years-go' }, a.years.map(editLink), h('a', { class: 'btn', href: '#homework', text: 'Homework uploads' })),
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1337,6 +1337,7 @@ function route() {
   if (hash === 'staff') return viewStaff();
   // The home page is the year chooser; every screen and the homework uploads are under All screens.
   if (hash === 'all') return viewHome();
+  if (hash === 'homework') return viewHomework();
   viewLogin();
 }
 window.addEventListener('hashchange', route);
@@ -1368,9 +1369,26 @@ function viewHome() {
       h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#', text: 'Edit screens' }), themeBtn())),
     h('div', { class: 'years' }, cards)));
   YEARS.forEach(subscribe);
+  const fn = () => cards.forEach(c => c._fill());
+  listeners.add(fn); cleanup = () => listeners.delete(fn);
+}
+
+// Homework uploads (Sparx and Tassomai) on their own page, linked from the home page chooser.
+function viewHomework() {
+  const body = h('div', {}, h('p', { class: 'hint', text: 'Checking your sign-in…' }));
+  app.append(h('div', { class: 'wrap' },
+    h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Homework uploads' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
+      h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn', href: '#', text: 'Back' }), themeBtn())),
+    body));
+  YEARS.forEach(subscribe);
   let hwCards = [];
-  access().then(a => { if (a.state !== 'ok' || !app.querySelector('.years')) return; const p = homeworkPanel(); hwCards = [...p.querySelectorAll('.hw-card')]; app.querySelector('.wrap').append(p); }).catch(() => {});
-  const fn = () => { cards.forEach(c => c._fill()); hwCards.forEach(c => c._fill && c._fill()); };
+  const tok = routeTok;
+  access().then(a => {
+    if (tok !== routeTok) return;
+    if (a.state !== 'ok') { body.replaceChildren(h('p', { class: 'hint', text: 'Only year team editors can upload homework reports.' })); return; }
+    const p = homeworkPanel(); hwCards = [...p.querySelectorAll('.hw-card')]; body.replaceChildren(p);
+  }).catch(() => {});
+  const fn = () => hwCards.forEach(c => c._fill && c._fill());
   listeners.add(fn); cleanup = () => listeners.delete(fn);
 }
 

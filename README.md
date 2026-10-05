@@ -9,7 +9,8 @@ It's a static site (no build step), hosted on Vercel, with data and sign-in in i
 | Address | What it shows |
 |---|---|
 | `/` | Home: choose a year to edit |
-| `/#all` | All screens, with links to every TV screen and the homework uploads |
+| `/#all` | All screens, with links to every TV screen |
+| `/#homework` | Sparx and Tassomai uploads (linked from the home page) |
 | `/#y7` | Year 7 centre screen (landscape TV) |
 | `/#y7-left`, `/#y7-right` | Year 7 portrait screens |
 | `/#edit-y7`, `/#edit-y7-left`, `/#edit-y7-right` | Editors for those screens |
