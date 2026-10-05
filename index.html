@@ -972,9 +972,8 @@ function lessonRows(y, les, np) {
   let rows;
   if (tt && tt.weeks) { const w = weekInfo(np.date); const day = w && tt.weeks[w.letter] && tt.weeks[w.letter][np.date.getDay()]; rows = (day && day[np.p]) || []; }
   else rows = (les && les.periods && les.periods[np.p]) || [];
-  // Room codes only ("C212 - Food" -> "C212"), and the hidden groups left out.
-  return rows.filter(r => !hwHidden(y, String(r.group || '').slice(y.length - 1)))
-    .map(r => Object.assign({}, r, { room: String(r.room || '').replace(/\s+-\s+.*$/, '') }));
+  // Room codes only ("C212 - Food" -> "C212").
+  return rows.map(r => Object.assign({}, r, { room: String(r.room || '').replace(/\s+-\s+.*$/, '') }));
 }
 function lessonSource(y, les, np) {
   const tt = store.timetable && store.timetable[y];
