@@ -202,6 +202,9 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .lrow .r { font-family: var(--display); font-weight: 700; color: var(--tv-dim); white-space: nowrap; font-variant-numeric: tabular-nums; max-width: 7ch; overflow: hidden; text-overflow: ellipsis; }
 .next-list.dense .lrow { padding: 7px 12px; font-size: 23px; }
 .next-list.dense .lrow .g { font-size: 24px; }
+.next-list.xdense { gap: 6px 10px; }
+.next-list.xdense .lrow { padding: 4px 10px; font-size: 21px; }
+.next-list.xdense .lrow .g { font-size: 22px; }
 .next-empty { font-size: 28px; color: var(--tv-dim); margin-top: 18px; }
 .src { font-size: 20px; color: var(--tv-dim); margin-top: 12px; }
 .bars { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(4, auto); gap: 10px 36px; margin-top: 14px; }
@@ -261,6 +264,10 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .srow .v { text-align: right; font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; }
 .srow.top .v { color: var(--rose); }
 .srow.top .v::before { content: "\2605 "; font-size: .7em; vertical-align: .15em; }
+.stat-rows.many { gap: 12px; }
+.stat-rows.many .srow { font-size: 34px; }
+.stat-rows.many .track { height: 42px; border-radius: 12px; }
+.stat-rows.many .fill { border-radius: 12px; }
 .stat-rows.houses .srow { grid-template-columns: 210px minmax(0, 1fr) 120px; font-size: 38px; }
 .bd-hero { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; }
 .bd-hero b { font-family: var(--display); font-weight: 700; font-size: 210px; line-height: .9; color: var(--c); font-variant-numeric: tabular-nums; }
@@ -287,6 +294,11 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .bcard.today { background: linear-gradient(150deg, var(--maroon), #4a0d29); color: #fff; padding-block: 44px; }
 .bcard.today h3 { color: #EBA7BE; }
 .bcard.today p { font-size: 64px; }
+.p-week .pp { justify-content: center; text-align: center; }
+.wk { display: flex; flex-direction: column; align-items: center; line-height: .85; margin-top: 30px; }
+.wk-w { font-family: var(--display); font-weight: 700; font-size: 220px; letter-spacing: -.03em; }
+.wk-l { font-family: var(--display); font-weight: 700; font-size: 520px; color: var(--rose); letter-spacing: -.04em; }
+.wk-t { font-size: 64px; font-weight: 600; color: var(--tv-dim); margin-top: 40px; }
 .value-word { font-family: var(--display); font-weight: 700; font-size: 168px; line-height: .95; letter-spacing: -.03em; color: var(--rose); overflow-wrap: anywhere; }
 .value-img { width: 100%; max-height: 640px; object-fit: contain; border-radius: 18px; }
 .p-poster { background: #000; }
@@ -393,6 +405,10 @@ function themeBtn(cls = 'btn ghost') {
 const GROUP_LETTERS = ['B', 'C', 'D', 'F', 'H', 'K', 'N', 'P'];
 const groupIndex = g => { const m = /([A-Z])\s*$/i.exec(String(g || '').trim()); return m ? GROUP_LETTERS.indexOf(m[1].toUpperCase()) : -1; };
 const groupColor = g => { const i = groupIndex(g); return i >= 0 ? HC[i] : 'var(--tv-dim)'; };
+// Some years name tutor groups differently (Year 11: Q5 to Q9, T4 to T9). The centre screen's "Tutor groups" setting lists them;
+// empty means the house letters. Groups that aren't a house letter get the school accent and no mascot.
+const groupsOf = centre => { const g = centre && Array.isArray(centre.groups) ? centre.groups.map(x => String(x).trim()).filter(Boolean) : []; return g.length ? g : GROUP_LETTERS; };
+const suffixColor = L => { const i = GROUP_LETTERS.indexOf(String(L).toUpperCase()); return i >= 0 ? HC[i] : 'var(--hot)'; };
 const SIDES = { left: 'Left', right: 'Right' };
 const SEG = ['#5bbf4a', '#ff9f1a', '#f2c514', '#e5383b', '#8a90a0'];
 const SLIDE_TYPES = {
@@ -406,6 +422,7 @@ const SLIDE_TYPES = {
   info: { label: 'Information', hint: 'Lines starting with "- " become bullets. "- 25% Attendance: detail" becomes a big tile.' },
   housepoints: { label: 'House points', hint: 'Shows the house points entered on the centre screen.' },
   sotw: { label: 'Students of the week', hint: 'Shows the students entered on the centre screen.' },
+  week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Update it each Monday.' },
 };
 const SLIDE_DEFAULTS = {
   list: { title: '', subtitle: '', items: '', emptyText: '' },
@@ -418,6 +435,7 @@ const SLIDE_DEFAULTS = {
   info: { title: '', body: '' },
   housepoints: { title: 'House points' },
   sotw: {},
+  week: { title: '', week: '', teachingWeek: '' },
 };
 const newSlide = type => ({ id: uid(), type, hidden: false, ...clone(SLIDE_DEFAULTS[type] || {}) });
 const normalSide = d => Object.assign({ slides: [], slideSeconds: 12 }, d ? clone(d) : {});
@@ -442,6 +460,7 @@ function hasContent(s, centre) {
     case 'info': return !!(s.title || s.body);
     case 'housepoints': return Object.values(centre.housePoints || {}).some(v => +v > 0);
     case 'sotw': return centre.sotw.students.some(x => x.name);
+    case 'week': return !!s.week;
   }
   return false;
 }
@@ -738,6 +757,7 @@ class Stage {
     const rows = (this.les && this.les.periods && this.les.periods[np.p]) || [];
     const list = $('.next-list', this.el);
     list.classList.toggle('dense', rows.length > 8);
+    list.classList.toggle('xdense', rows.length > 10);
     if (!rows.length) list.replaceChildren(h('div', { class: 'next-empty', text: this.les ? 'No lessons listed for this period.' : 'Lessons will show here once the timetable is connected.' }));
     else list.replaceChildren(...rows.slice(0, 14).map(r => h('div', { class: 'lrow' }, h('span', { class: 'g', text: r.group }), h('span', { class: 's', text: r.subject }), h('span', { class: 'r', text: r.room }))));
     const src = $('.src', this.el);
@@ -861,9 +881,9 @@ class PortraitStage {
           : h('div', { class: 'p-empty', text: s.emptyText || 'Nobody listed yet.' })));
       }
       case 'stat': {
-        const rows = GROUP_LETTERS.map((L, k) => ({ g: yn + L, letter: L, v: +((s.values || {})[L]) || 0, c: HC[k] }));
+        const rows = groupsOf(this.centre).map(L => ({ g: yn + L, letter: L, v: +((s.values || {})[L]) || 0, c: suffixColor(L) }));
         const max = s.unit === '%' ? 100 : Math.max(1, ...rows.map(r => r.v)) * 1.08;
-        return wrap('p-stat', pad(...head(s.metric, s.title), h('div', { class: 'stat-rows' }, raceRows(rows, max, s.unit))));
+        return wrap('p-stat', pad(...head(s.metric, s.title), h('div', { class: 'stat-rows' + (rows.length > 8 ? ' many' : '') }, raceRows(rows, max, s.unit))));
       }
       case 'breakdown': {
         const segs = (s.segments || []).filter(x => x.label || +x.value).map((x, k) => ({ label: x.label, v: +x.value || 0, c: SEG[k % SEG.length] }));
@@ -889,6 +909,10 @@ class PortraitStage {
       case 'value':
         return wrap('p-value', pad(h('div', { class: 's-eyebrow', text: s.title || 'Value of the week' }), h('div', { class: 'value-word', text: s.value || '' }),
           s.photo ? h('img', { class: 'value-img', src: photoUrl(s.photo), alt: '' }) : null, s.text ? h('p', { class: 'info-p', text: s.text }) : null));
+      case 'week':
+        return wrap('p-week', pad(h('div', { class: 's-eyebrow', text: s.title || VALUES_LINE }),
+          h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: s.week || '' })),
+          s.teachingWeek ? h('div', { class: 'wk-t', text: 'Teaching week ' + s.teachingWeek }) : null));
       case 'poster':
         return wrap('p-poster', s.photo ? h('img', { src: photoUrl(s.photo), alt: s.title || '' }) : pad(h('div', { class: 'p-empty', text: 'Add an image for this poster.' })));
       case 'info':
@@ -1112,7 +1136,9 @@ function viewEdit(y) {
 
     // Settings
     form.append(h('fieldset', {}, h('legend', { text: 'Screen settings' }),
-      h('div', { style: 'max-width:240px' }, field('Seconds per slide', 'secs', draft.slideSeconds, v => draft.slideSeconds = v, 'number', { min: 5, max: 60 }))));
+      h('div', { style: 'max-width:240px' }, field('Seconds per slide', 'secs', draft.slideSeconds, v => draft.slideSeconds = v, 'number', { min: 5, max: 60 })),
+      field('Tutor groups (leave blank if they are named after houses, like 7B and 7C)', 'groups', (draft.groups || []).join(', '), v => { draft.groups = v.split(/[\s,]+/).map(x => x.trim().replace(/^\d{1,2}/, '')).filter(Boolean); }),
+      h('p', { class: 'hint', text: 'Used by the tutor group race slides on the side screens. Write the letters and numbers after the year, e.g. Q5, Q6, T4.' })));
 
     // Lessons (read only)
     const les = store.lessons[y];
@@ -1257,7 +1283,7 @@ function viewEditSide(y, side) {
       case 'list': body.append(F('Title', 'title', 'text', {}, true), F('Small heading (optional)', 'subtitle', 'text', {}, true),
         F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true)); break;
       case 'stat': body.append(F('Title', 'title'), F('What the number means', 'metric'), F('Unit (e.g. %)', 'unit'),
-        h('div', { class: 'wide groups-form' }, GROUP_LETTERS.map((L, k) => h('div', { style: '--hc:' + HC[k] },
+        h('div', { class: 'wide groups-form' }, groupsOf(store.screens[y]).map(L => h('div', { style: '--hc:' + suffixColor(L) },
           field(y.slice(1) + L, 'sl-' + s.id + '-v' + L, (s.values || {})[L] ?? '', v => { s.values = s.values || {}; s.values[L] = v; }, 'number', { step: 'any', inputmode: 'decimal' }))))); break;
       case 'breakdown': {
         body.append(F('Title', 'title'), F('What it shows', 'metric'));
@@ -1274,6 +1300,7 @@ function viewEditSide(y, side) {
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
+      case 'week': body.append(F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
       case 'housepoints': body.append(F('Title', 'title', 'text', {}, true)); break;
     }
     const showId = 'sl-' + s.id + '-show';
