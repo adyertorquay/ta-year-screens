@@ -1028,7 +1028,7 @@ class Stage {
   }
   buildSlides() {
     const s = this.scr, list = [], today = todayISO();
-    if (s.sotw.students.filter(x => x.name).length) list.push({ type: 'sotw' });
+    if (s.sotw.students.filter(x => x.name).length) list.push({ type: 'sotw', sotw: s.sotw }); // the content is part of the key, so edits redraw it
     s.celebrations.filter(c => c.title || c.photo).forEach((c, i) => list.push({ type: 'celebrate', c, color: HC[(i * 3 + 1) % 8] }));
     s.notices.filter(n => n.title && (!n.until || n.until >= today)).forEach((n, i) => list.push({ type: 'notice', n, color: HC[(i * 5 + 2) % 8] }));
     if (!list.length) list.push({ type: 'welcome' });
