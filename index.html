@@ -1105,11 +1105,7 @@ function viewHome() {
   app.append(h('div', { class: 'wrap' },
     h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
       h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#login', text: 'Edit screens' }), themeBtn())),
-    h('div', { class: 'years' }, cards),
-    h('div', { class: 'howto' },
-      h('div', {}, h('h3', { text: 'For year teams' }), h('p', { text: 'Each year has three screens. The centre one has notices, celebrations, students of the week and house points. The tall left and right screens play a list of slides your team chooses: Learning Legends, Sparx and Tassomai charts, leaderboards, birthdays, posters. Edit, check the preview, then Save. Screens update within a few seconds; nobody needs to touch the TV.' })),
-      h('div', {}, h('h3', { text: 'For the TVs' }), h('p', { text: 'Open the Left, Centre or Right link in that TV\'s browser and press Full screen. Slides rotate on their own, notices drop off after their end date, and the clock and next lesson keep themselves current.' })),
-      h('div', {}, h('h3', { text: 'Next lessons' }), h('p', { text: 'The Up next panel reads a timetable feed. It shows a sample timetable for now; the plan is for a small sync job to fill it from Arbor before each period.' })))));
+    h('div', { class: 'years' }, cards)));
   YEARS.forEach(subscribe);
   const fn = () => cards.forEach(c => c._fill());
   listeners.add(fn); cleanup = () => listeners.delete(fn);
