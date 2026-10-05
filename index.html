@@ -581,7 +581,14 @@ async function readBook(file) {
   return tables;
 }
 const AT_RX = /^\s*[MRS]\s*\(AT\)\s*$/i;
-const GROUP_RX = /(?:^|[^0-9])(7|8|9|10|11)\s?([A-Z]{1,2}\d?)(?![A-Za-z])/i;
+const GROUP_RX = /(?:^|[^0-9])0?(7|8|9|10|11)\s*[-/.]?\s*([A-Z]{1,2}\d?)(?![A-Za-z])/i;
+const HOUSE_RX = new RegExp('(?:^|[^0-9])0?(7|8|9|10|11)\\D{0,8}?(' + HOUSES.map(x => x[0]).join('|') + ')', 'i');
+// "7B", "07B", "7-B", "Year 7 B", "11Q5" or "7 Brunel" -> { y: 'y7', L: 'B' }
+const parseGroup = v => {
+  const t = String(v ?? '').replace(/\b(year|yr)\s*/gi, '').trim();
+  const hm = t.match(HOUSE_RX); if (hm) return { y: 'y' + hm[1], L: hm[2][0].toUpperCase() };
+  const m = t.match(GROUP_RX); return m ? { y: 'y' + m[1], L: m[2].toUpperCase() } : null;
+};
 const toNum = x => {
   if (typeof x === 'number') return x;
   const t = String(x ?? '').trim();
@@ -591,7 +598,7 @@ const toNum = x => {
   const m = t.replace(/,/g, '').match(/^-?\d+(\.\d+)?/); return m ? +m[0] : null;
 };
 const colShare = (t, i, f) => { const s = t.rows.slice(0, 300).map(r => r[i]).filter(v => String(v ?? '').trim()); return s.length ? s.filter(f).length / s.length : 0; };
-const isGroupCol = (t, i) => colShare(t, i, v => GROUP_RX.test(String(v))) > 0.6;
+const isGroupCol = (t, i) => colShare(t, i, v => !!parseGroup(v)) > 0.6;
 const isNumCol = (t, i) => colShare(t, i, v => toNum(v) != null) > 0.6;
 function guessGroup(t) {
   const reg = t.head.findIndex(x => /^reg\.?\s*group$/i.test(x)); // Sparx's tutor group column
@@ -617,10 +624,10 @@ function summarise(t, kind, g, v) {
     const nums = vals.map(x => x.v).filter(x => x != null);
     if (nums.length && nums.every(x => x <= 1) && nums.some(x => x > 0 && x < 1)) vals.forEach(x => { if (x.v != null) x.v *= 100; });
   }
-  const years = {}; let used = 0;
+  const years = {}, missed = {}; let used = 0;
   for (const x of vals) {
-    const m = x.grp.match(GROUP_RX); if (!m) continue;
-    const y = 'y' + m[1], L = m[2].toUpperCase(), val = x.v || 0;
+    const m = parseGroup(x.grp); if (!m) { const k = x.grp.trim() || '(blank)'; missed[k] = (missed[k] || 0) + 1; continue; }
+    const { y, L } = m, val = x.v || 0;
     const Y = years[y] = years[y] || { n: 0, sum: 0, band: b.bands.map(() => 0), groups: {} };
     Y.n++; Y.sum += val; used++; Y.band[b.bands.findIndex(([, f]) => f(val))]++;
     const G = Y.groups[L] = Y.groups[L] || { n: 0, sum: 0, top: 0 }; G.n++; G.sum += val; if (b.bands[0][1](val)) G.top++;
@@ -629,7 +636,7 @@ function summarise(t, kind, g, v) {
   for (const [y, Y] of Object.entries(years)) out[y] = { students: Y.n, average: Math.round(Y.sum / Y.n),
     groups: Object.fromEntries(Object.entries(Y.groups).map(([L, G]) => [L, b.unit === '%' ? round1(G.top / G.n * 100) : Math.round(G.sum / G.n)])),
     breakdown: b.bands.map(([label], k) => ({ label, value: round1(Y.band[k] / Y.n * 100) })) };
-  return { years: out, used, skipped: t.rows.length - used, what };
+  return { years: out, used, skipped: t.rows.length - used, missed, what };
 }
 // One upload per report: Sparx is a single report covering Maths, Reader and Science.
 const HW_UPLOADS = [
@@ -676,7 +683,8 @@ function hwCard(up) {
     }
     if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
     const any = Object.values(res)[0].r;
-    lines.unshift(any.used + ' students read' + (any.skipped ? ', ' + any.skipped + ' row' + (any.skipped === 1 ? '' : 's') + ' without a tutor group left out' : '') + '.');
+    const top = Object.entries(any.missed).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => '"' + k.slice(0, 20) + '" (' + n + ')').join(', ');
+    lines.unshift(any.used + ' students read' + (any.skipped ? '. ' + any.skipped + ' row' + (any.skipped === 1 ? ' was' : 's were') + ' left out because the tutor group wasn\'t recognised, for example ' + top : '') + '.');
     say(lines.join('\n')); results = res; btn.disabled = false;
   };
   input.addEventListener('change', async () => {
