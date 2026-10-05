@@ -684,6 +684,13 @@ function summarise(t, kind, g, v) {
       Y.n++; Y.sum += x.v || 0; used++; Y.band[b.bands.findIndex(([, f]) => f(x.v || 0))]++;
       continue;
     }
+    const yo = /^Y(\d{1,2}) \(no tutor group\)$/.exec(x.grp);
+    if (yo) { // a Tassomai student with no Sparx match: in the year totals, not in any tutor group
+      const y = 'y' + yo[1]; if (!YEARS.includes(y)) { const k = 'Y' + yo[1]; missed[k] = (missed[k] || 0) + 1; continue; }
+      const Y = years[y] = years[y] || { n: 0, sum: 0, band: b.bands.map(() => 0), groups: {} };
+      Y.n++; Y.sum += x.v || 0; used++; Y.band[b.bands.findIndex(([, f]) => f(x.v || 0))]++;
+      continue;
+    }
     const m = parseGroup(x.grp); if (!m) { const k = x.grp.trim() || '(blank)'; missed[k] = (missed[k] || 0) + 1; continue; }
     const { y, L } = m, val = x.v || 0;
     if (hwHidden(y, L)) { const k = y.slice(1) + L + ' (hidden)'; missed[k] = (missed[k] || 0) + 1; continue; }
@@ -697,15 +704,62 @@ function summarise(t, kind, g, v) {
     breakdown: b.bands.map(([label], k) => ({ label, value: round1(Y.band[k] / Y.n * 100) })) };
   return { years: out, used, skipped: t.rows.length - used, missed, odd, blank: t.rows.filter(r => !String(r[v] ?? '').trim()).length, what, yearOnly };
 }
+// Tassomai has no tutor groups, so its students are matched by name to the Sparx report chosen on the same page.
+// The names stay in this browser tab's memory only: nothing about them is saved.
+let hwRoster = null;
+const hwRosterWatch = new Set();
+const normName = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+const nameCols = t => ({ first: t.head.findIndex(x => /^(first\s*name|forename|given\s*name)s?$/i.test(x.trim())), last: t.head.findIndex(x => /^(last\s*name|surname|family\s*name)$/i.test(x.trim())) });
+function buildRoster(tables) {
+  const map = new Map(); let n = 0;
+  for (const t of tables) {
+    const { first, last } = nameCols(t), g = guessGroup(t); if (first < 0 || last < 0 || g < 0) continue;
+    for (const r of t.rows) {
+      const m = parseGroup(r[g]); if (!m) continue;
+      const add = k => { if (k.length < 3) return; const set = map.get(k) || new Set(); set.add(m.y.slice(1) + m.L); map.set(k, set); };
+      const fn = normName(r[first]), ln = normName(r[last]), f1 = normName(String(r[first] ?? '').split(/\s+/)[0]);
+      add(fn + '|' + ln); if (f1 !== fn) add(f1 + '|' + ln); n++;
+    }
+  }
+  return n ? { map, n } : null;
+}
+// Adds a "Tutor group (matched from Sparx)" column to a Tassomai table. Unmatched students keep their year only.
+function addTutorGroups(tables) {
+  for (const t of tables) {
+    const { first, last } = nameCols(t); if (first < 0 || last < 0) continue;
+    const formCol = t.head.findIndex(x => /^form/i.test(x));
+    let col = t.head.indexOf('Tutor group (matched from Sparx)');
+    if (col < 0) { col = t.head.length; t.head.push('Tutor group (matched from Sparx)'); }
+    let matched = 0, total = 0;
+    for (const r of t.rows) {
+      const ys = formCol >= 0 ? [...new Set([...String(r[formCol] ?? '').matchAll(/\bY(\d{1,2})\b/g)].map(m => m[1]))] : [];
+      const yr = ys.length === 1 ? ys[0] : '';
+      if (yr && !YEARS.includes('y' + yr)) { r[col] = 'Y' + yr + ' (no tutor group)'; continue; } // sixth form
+      total++;
+      const fn = normName(r[first]), ln = normName(r[last]), f1 = normName(String(r[first] ?? '').split(/\s+/)[0]);
+      let found = null;
+      for (const k of [fn + '|' + ln, f1 + '|' + ln, ln + '|' + fn]) {
+        const set = hwRoster && hwRoster.map.get(k); if (!set) continue;
+        const ok = [...set].filter(c => !yr || c.startsWith(yr) && !/^\d/.test(c.slice(yr.length)));
+        if (ok.length === 1) { found = ok[0]; break; }
+      }
+      if (found) matched++;
+      r[col] = found || (yr ? 'Y' + yr + ' (no tutor group)' : '');
+    }
+    t.match = { matched, total };
+  }
+}
+
 // One upload per report: Sparx is a single report covering Maths, Reader and Science.
 const HW_UPLOADS = [
   { name: 'Sparx', sub: 'Maths, Reader and Science in one report, .xlsx or .csv', kinds: ['sparx-maths', 'sparx-reader', 'sparx-science'] },
   { name: 'Tassomai', sub: 'Export file, .xlsx or .csv', kinds: ['tassomai'] },
 ];
 function homeworkPanel() {
+  hwRosterWatch.clear();
   return h('section', { class: 'hw' },
     h('div', { class: 'hw-head' }, h('h2', { text: 'Homework reports' }),
-      h('p', { text: 'Upload the latest Sparx and Tassomai reports to update the homework slides on every screen. Only tutor group and year totals are saved, never student names.' })),
+      h('p', { text: 'Upload the latest Sparx and Tassomai reports to update the homework slides on every screen. Choose the Sparx report first so Tassomai students can be matched to their tutor groups. Only tutor group and year totals are saved, never student names.' })),
     h('div', { class: 'hw-grid' }, HW_UPLOADS.map(hwCard)));
 }
 function hwCard(up) {
@@ -738,6 +792,8 @@ function hwCard(up) {
       const r = summarise(t, k, g, vp.c);
       if (!r.used) { lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
       if (r.yearOnly) lines.push(label + ': this export lists subject classes, not tutor groups, so it shows whole-year results only (no tutor group race).');
+      if (t.match) lines.push(label + ': tutor groups found for ' + t.match.matched + ' of ' + t.match.total + ' students by matching names with the Sparx report. The rest count in their year\'s totals only.');
+      else if (k === 'tassomai' && nameCols(t).first >= 0) lines.push(label + ': to show it by tutor group, choose this week\'s Sparx report in the Sparx box on this page first.');
       res[k] = { r, group: t.head[g], value: t.head[vp.c] }; const b = HW_BANDS[r.what];
       const oddTop = Object.entries(r.odd).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([x, n]) => '"' + x.slice(0, 20) + '" (' + n + ')').join(', ');
       if (oddTop) lines.push(label + ': some cells weren\'t numbers, for example ' + oddTop + '.');
@@ -755,6 +811,12 @@ function hwCard(up) {
     const f = input.files && input.files[0]; if (!f) return say('');
     say('Reading ' + f.name + '…');
     try { tables = await readBook(f); } catch (e) { return say(e.message || 'That file could not be read.', true); }
+    if (up.kinds.includes('sparx-maths')) { hwRoster = buildRoster(tables); hwRosterWatch.forEach(fn => fn()); }
+    setup();
+  });
+  // Fills the column choices for the file just read (again when a Sparx roster arrives for a Tassomai file).
+  function setup() {
+    if (up.kinds.includes('tassomai') && hwRoster) addTutorGroups(tables);
     const opts = (sel, none) => sel.replaceChildren(h('option', { value: '', text: none }),
       ...tables.flatMap((t, ti) => t.head.map((x, ci) => h('option', { value: ti + ':' + ci, text: tables.length > 1 ? t.sheet + ': ' + x : x }))));
     opts(gSel, 'Choose…'); up.kinds.forEach(k => opts(vSel[k], 'Not in this file'));
@@ -765,8 +827,10 @@ function hwCard(up) {
     }
     const gt = firstT >= 0 ? firstT : tables.findIndex(t => guessGroup(t) >= 0);
     if (gt >= 0 && guessGroup(tables[gt]) >= 0) gSel.value = gt + ':' + guessGroup(tables[gt]);
+    const mt = tables.findIndex(t => t.match); if (mt >= 0) gSel.value = mt + ':' + tables[mt].head.indexOf('Tutor group (matched from Sparx)');
     cols.hidden = false; preview();
-  });
+  }
+  if (up.kinds.includes('tassomai')) hwRosterWatch.add(() => { if (tables) setup(); });
   gSel.addEventListener('change', preview); Object.values(vSel).forEach(s => s.addEventListener('change', preview));
   btn.addEventListener('click', async () => {
     if (!results) return;
