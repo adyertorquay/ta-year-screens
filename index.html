@@ -798,7 +798,7 @@ function signOutLink() {
 function signinShell(...kids) {
   return h('div', { class: 'signin' }, h('div', { class: 'signin-card' }, logoImg(),
     h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }), ...kids,
-    h('div', { class: 'foot' }, h('a', { href: '#', text: 'All screens' }), themeBtn('linkish'), signOutLink()),
+    h('div', { class: 'foot' }, h('a', { href: '#all', text: 'All screens' }), themeBtn('linkish'), signOutLink()),
     h('div', { class: 'values', text: VALUES_LINE })));
 }
 const editLink = y => h('a', { class: 'btn', href: '#edit-' + y, text: yearName(y) });
@@ -816,7 +816,7 @@ function viewLogin(a, want) {
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
       h('div', { class: 'years-go' }, a.years.map(editLink)),
-      a.admin ? h('a', { class: 'btn ghost', href: '#staff', text: 'Manage year teams' }) : null];
+      ];
     app.replaceChildren(signinShell(...body));
   };
   draw(a || { state: 'loading' });
@@ -885,7 +885,7 @@ function viewStaff() {
     });
     app.replaceChildren(h('div', { class: 'wrap', style: 'max-width:900px' },
       h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Year teams' }), h('div', { class: 'tagline', text: 'who can edit which screens' }))),
-        h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, whoChip(a.me), h('a', { class: 'btn ghost', href: '#login', text: 'Back' }), themeBtn())),
+        h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, whoChip(a.me), h('a', { class: 'btn ghost', href: '#', text: 'Back' }), themeBtn())),
       h('p', { class: 'note', style: 'margin-top:18px' }, 'Create each person\'s account first (Supabase, Authentication, Add user). New accounts can only view, which is right for the TVs. Add staff here and tick their year to let them edit. Admins can always edit every year.'),
       list,
       h('label', { class: 'f', for: 'staff-q', style: 'margin-top:20px' }, 'Add a person', q), hits,
@@ -1334,9 +1334,10 @@ function route() {
     if (edit) return gateEdit(y, () => side ? viewEditSide(y, side) : viewEdit(y));
     return viewScreen(y, side || null);
   }
-  if (hash === 'login') return viewLogin();
   if (hash === 'staff') return viewStaff();
-  viewHome();
+  // The home page is the year chooser; every screen and the homework uploads are under All screens.
+  if (hash === 'all') return viewHome();
+  viewLogin();
 }
 window.addEventListener('hashchange', route);
 
@@ -1364,7 +1365,7 @@ function viewHome() {
   });
   app.append(h('div', { class: 'wrap' },
     h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
-      h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#login', text: 'Edit screens' }), themeBtn())),
+      h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#', text: 'Edit screens' }), themeBtn())),
     h('div', { class: 'years' }, cards)));
   YEARS.forEach(subscribe);
   let hwCards = [];
@@ -1378,7 +1379,7 @@ function viewScreen(y, side) {
   const root = h('div', { class: 'tvroot' });
   const ctl = h('div', { class: 'tvctl' },
     h('button', { type: 'button', onclick: goFull, text: 'Full screen' }), themeBtn(''),
-    h('a', { href: '#edit-' + y + (side ? '-' + side : ''), text: 'Edit' }), h('a', { href: '#', text: 'All screens' }));
+    h('a', { href: '#edit-' + y + (side ? '-' + side : ''), text: 'Edit' }), h('a', { href: '#all', text: 'All screens' }));
   app.append(root, ctl);
   const stage = side ? new PortraitStage(root, y, side) : new Stage(root, y);
   let idleT; const wake = () => { ctl.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ctl.classList.add('idle'), 3500); };
@@ -1581,7 +1582,7 @@ function editorTop(y, side) {
   return h('div', { style: 'display:flex;flex-direction:column;gap:14px' },
     h('div', { class: 'topbar' },
       h('div', { class: 'brand' }, stripe(), h('h1', { text: 'Edit ' + yearName(y) + ' screens' })),
-      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, h('nav', { class: 'yeartabs', 'aria-label': 'Year groups' }, h('a', { href: '#', text: 'All' }), YEARS.filter(yy => !currentAccess || currentAccess.years.includes(yy)).map(yy => h('a', { href: link(yy, side), 'aria-current': yy === y ? 'page' : null, text: yearName(yy) }))), editorWho(), themeBtn())),
+      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, h('nav', { class: 'yeartabs', 'aria-label': 'Year groups' }, h('a', { href: '#all', text: 'All' }), YEARS.filter(yy => !currentAccess || currentAccess.years.includes(yy)).map(yy => h('a', { href: link(yy, side), 'aria-current': yy === y ? 'page' : null, text: yearName(yy) }))), editorWho(), themeBtn())),
     h('nav', { class: 'screentabs', 'aria-label': 'Screens' }, [['left', 'Left screen'], ['centre', 'Centre screen'], ['right', 'Right screen']].map(([s, t]) => h('a', { href: link(y, s), 'aria-current': s === side ? 'page' : null, text: t }))));
 }
 
@@ -1768,9 +1769,6 @@ async function shrink(file) {
 }
 
 // ---------- boot ----------
-if (window.SCREENS_BACKEND && window.SCREENS_BACKEND.mode === 'demo') document.body.append(h('div', { class: 'demo-bar', role: 'note' },
-  h('span', { text: 'Demo mode: sample data, and changes are saved in this browser only.' }),
-  h('button', { class: 'btn ghost', type: 'button', text: 'Reset', onclick: () => window.SCREENS_BACKEND.reset() })));
 route();
 (async () => {
   try {
