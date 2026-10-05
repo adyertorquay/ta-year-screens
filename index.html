@@ -785,18 +785,21 @@ function hwCard(up) {
   const preview = () => {
     results = null; btn.disabled = true;
     const gp = pick(gSel), lines = [], res = {};
+    let fix = false; // the column boxes only show when a column couldn't be found or looks wrong
     for (const k of up.kinds) {
-      const vp = pick(vSel[k]); if (!vp) continue;
+      const vp = pick(vSel[k]); if (!vp) { fix = true; continue; }
       const t = tables[vp.t], g = gp && gp.t === vp.t ? gp.c : guessGroup(t), label = HOMEWORK[k].name;
-      if (g < 0) { lines.push(label + ': choose the tutor group column.'); continue; }
+      if (g < 0) { fix = true; lines.push(label + ': choose the tutor group column.'); continue; }
       const r = summarise(t, k, g, vp.c);
-      if (!r.used) { lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
+      if (!r.used) { fix = true; lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
       if (!t.match && k === 'tassomai' && nameCols(t).first >= 0) lines.push(label + ': to show it by tutor group, choose this week\'s Sparx report in the Sparx box on this page first.');
       res[k] = { r, group: t.head[g], value: t.head[vp.c] }; const b = HW_BANDS[r.what];
       const oddTop = Object.entries(r.odd).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([x, n]) => '"' + x.slice(0, 20) + '" (' + n + ')').join(', ');
+      if (oddTop) fix = true;
       if (oddTop) lines.push(label + ': some cells weren\'t numbers, for example ' + oddTop + '.');
-      else if (r.blank === t.rows.length) lines.push(label + ': the "' + t.head[vp.c].replace(/\s+/g, ' ').slice(0, 40) + '" column is empty.');
+      else if (r.blank === t.rows.length && (fix = true)) lines.push(label + ': the "' + t.head[vp.c].replace(/\s+/g, ' ').slice(0, 40) + '" column is empty.');
     }
+    cols.hidden = !fix && !!Object.keys(res).length;
     if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
     say(lines.length ? lines.join('\n') : 'Ready to upload.'); results = res; btn.disabled = false;
   };
@@ -822,7 +825,7 @@ function hwCard(up) {
     const gt = firstT >= 0 ? firstT : tables.findIndex(t => guessGroup(t) >= 0);
     if (gt >= 0 && guessGroup(tables[gt]) >= 0) gSel.value = gt + ':' + guessGroup(tables[gt]);
     const mt = tables.findIndex(t => t.match); if (mt >= 0) gSel.value = mt + ':' + tables[mt].head.indexOf('Tutor group (matched from Sparx)');
-    cols.hidden = false; preview();
+    preview();
   }
   if (up.kinds.includes('tassomai')) hwRosterWatch.add(() => { if (tables) setup(); });
   gSel.addEventListener('change', preview); Object.values(vSel).forEach(s => s.addEventListener('change', preview));
