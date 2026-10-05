@@ -782,7 +782,7 @@ class Stage {
     src.textContent = !this.les ? '' : this.les.source === 'arbor' ? 'From Arbor' + (this.les.syncedAt ? ', updated ' + new Date(this.les.syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sample timetable. Arbor will supply this.';
   }
   renderTicker() {
-    const lines = (this.scr.ticker || []).map(t => String(t).trim()).filter(Boolean);
+    const lines = []; // The scrolling news bar is switched off (school's choice, 2026-10-05); any saved lines are kept but not shown.
     const tick = $('.tv-ticker', this.el); tick.hidden = !lines.length;
     this.el.style.gridTemplateRows = lines.length ? '' : '150px 1fr 0 14px';
     const key = lines.join('\n'); if (key === this.tickKey) return; this.tickKey = key;
@@ -1146,11 +1146,6 @@ function viewEdit(y) {
     form.append(h('fieldset', {}, h('legend', { text: 'Celebrations' }),
       h('p', { class: 'hint', text: 'Trips, competitions, achievements. A photo fills the slide; without one it shows as a bold colour card. Check photo consent before uploading.' }),
       cList, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { draft.celebrations.push({ id: uid(), title: '', caption: '', photo: '' }); touch(); renderC(); }, text: 'Add celebration' })));
-
-    // Ticker
-    form.append(h('fieldset', {}, h('legend', { text: 'News ticker' }),
-      h('p', { class: 'hint', text: 'Short lines that scroll along the bottom. One per line. Leave empty to hide the ticker.' }),
-      field('Lines', 'ticker', (draft.ticker || []).join('\n'), v => draft.ticker = v.split('\n'), 'textarea', { rows: 4 })));
 
     // House points
     const hpSync = syncedHP(y);
