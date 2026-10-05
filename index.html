@@ -370,7 +370,8 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 @media (max-width: 760px) { .hw-grid { grid-template-columns: 1fr; } }
 .ycard .screens { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 6px; }
 .ycard .screens a { justify-content: center; padding-inline: 4px; min-width: 0; }
-@media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; } }
+@media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; }
+  .editor.side-right .preview { align-items: flex-end; } /* the right screen's preview sits on the right, like the TV */ }
 @media (prefers-reduced-motion: reduce) { .tick-track { animation: none; padding-left: 30px; } .slide { transition: none; } }
 </style>
 <style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}[hidden]{display:none!important}</style>
@@ -1641,7 +1642,7 @@ function viewEditSide(y, side) {
   const frame = h('div', { class: 'frame portrait' });
   const form = h('div', {});
   app.append(h('div', { class: 'wrap' }, editorTop(y, side),
-    h('div', { class: 'editor side-ed' }, form,
+    h('div', { class: 'editor side-ed side-' + side }, form,
       h('div', { class: 'preview' }, h('div', { class: 'eyebrow', text: 'Live preview' }), frame,
         h('div', { class: 'savebar' }, saveBtn, h('a', { class: 'btn', href: '#' + key, text: 'Open screen' }), playBtn), status, banner))));
 
