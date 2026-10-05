@@ -798,7 +798,7 @@ function signOutLink() {
 function signinShell(...kids) {
   return h('div', { class: 'signin' }, h('div', { class: 'signin-card' }, logoImg(),
     h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }), ...kids,
-    h('div', { class: 'foot' }, h('a', { href: '#all', text: 'All screens' }), themeBtn('linkish'), signOutLink()),
+    h('div', { class: 'foot' }, themeBtn('linkish'), signOutLink()),
     h('div', { class: 'values', text: VALUES_LINE })));
 }
 const editLink = y => h('a', { class: 'btn', href: '#edit-' + y, text: yearName(y) });
