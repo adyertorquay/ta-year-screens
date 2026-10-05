@@ -1499,7 +1499,7 @@ function viewScreen(y, side) {
   const root = h('div', { class: 'tvroot' });
   const ctl = h('div', { class: 'tvctl' },
     h('button', { type: 'button', onclick: goFull, text: 'Full screen' }), themeBtn(''),
-    h('a', { href: '#edit-' + y + (side ? '-' + side : ''), text: 'Edit' }), h('a', { href: '#all', text: 'All screens' }));
+    h('a', { href: '#edit-' + y + (side ? '-' + side : ''), text: 'Edit' }));
   app.append(root, ctl);
   const stage = side ? new PortraitStage(root, y, side) : new Stage(root, y);
   let idleT; const wake = () => { ctl.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ctl.classList.add('idle'), 3500); };
