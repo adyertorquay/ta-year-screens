@@ -542,6 +542,9 @@ const HW_BANDS = {
   score: { col: 'Score column', metric: 'Average score', unit: '', bands: [['500 plus', v => v >= 500], ['300 to 499', v => v >= 300], ['1 to 299', v => v > 0], ['Not started', () => true]] },
 };
 store.homework = {};
+// Groups in the reports that aren't shown (Adam, 5 Oct 2026). They are left out of the year totals too.
+const HW_HIDDEN_GROUPS = ['10PFH', '11JAG'];
+const hwHidden = (y, L) => HW_HIDDEN_GROUPS.includes(y.slice(1) + L);
 // Which upload a slide reads: chosen in the editor, or guessed from its title.
 const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWORK).find(([, k]) => new RegExp('^\\s*' + k.name + '\\b', 'i').test(s.title || '')) || [''])[0];
 function hwSlide(y, s) {
@@ -549,7 +552,7 @@ function hwSlide(y, s) {
   const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
   if (!yd) return s;
   const b = HW_BANDS[d.what || HOMEWORK[kind].what];
-  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric, unit: b.unit })
+  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).filter(L => !hwHidden(y, L)).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric, unit: b.unit })
     : Object.assign({}, s, { segments: yd.breakdown, metric: 'Whole year' });
 }
 const agoText = iso => { const m = Math.max(0, (Date.now() - Date.parse(iso)) / 60000);
@@ -630,6 +633,7 @@ function summarise(t, kind, g, v) {
   for (const x of vals) {
     const m = parseGroup(x.grp); if (!m) { const k = x.grp.trim() || '(blank)'; missed[k] = (missed[k] || 0) + 1; continue; }
     const { y, L } = m, val = x.v || 0;
+    if (hwHidden(y, L)) { const k = y.slice(1) + L + ' (hidden)'; missed[k] = (missed[k] || 0) + 1; continue; }
     const Y = years[y] = years[y] || { n: 0, sum: 0, band: b.bands.map(() => 0), groups: {} };
     Y.n++; Y.sum += val; used++; Y.band[b.bands.findIndex(([, f]) => f(val))]++;
     const G = Y.groups[L] = Y.groups[L] || { n: 0, sum: 0, top: 0 }; G.n++; G.sum += val; if (b.bands[0][1](val)) G.top++;
@@ -689,7 +693,7 @@ function hwCard(up) {
     if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
     const any = Object.values(res)[0].r;
     const top = Object.entries(any.missed).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => '"' + k.slice(0, 20) + '" (' + n + ')').join(', ');
-    lines.unshift(any.used + ' students read' + (any.skipped ? '. ' + any.skipped + ' row' + (any.skipped === 1 ? ' was' : 's were') + ' left out because the tutor group wasn\'t recognised, for example ' + top : '') + '.');
+    lines.unshift(any.used + ' students read' + (any.skipped ? '. ' + any.skipped + ' row' + (any.skipped === 1 ? ' was' : 's were') + ' left out (hidden groups, or a tutor group that wasn\'t recognised), for example ' + top : '') + '.');
     say(lines.join('\n')); results = res; btn.disabled = false;
   };
   input.addEventListener('change', async () => {
