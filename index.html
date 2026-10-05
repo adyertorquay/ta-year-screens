@@ -593,8 +593,9 @@ const toNum = x => {
   if (typeof x === 'number') return x;
   const t = String(x ?? '').trim();
   if (!t) return null;
-  if (/^(complete|completed|done|yes)$/i.test(t)) return 100;
-  if (/^(not started|none|no|-)$/i.test(t)) return 0;
+  if (/^(complete|completed|done|yes|y|✓|✔|✅)$/i.test(t)) return 100;
+  if (/^(not started|incomplete|none|no|n|-|✗|✘|x)$/i.test(t)) return 0;
+  const fr = t.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/); if (fr) return +fr[2] ? +fr[1] / +fr[2] * 100 : 0; // "2/3" tasks done
   const m = t.replace(/,/g, '').match(/^-?\d+(\.\d+)?/); return m ? +m[0] : null;
 };
 const colShare = (t, i, f) => { const s = t.rows.slice(0, 300).map(r => r[i]).filter(v => String(v ?? '').trim()); return s.length ? s.filter(f).length / s.length : 0; };
