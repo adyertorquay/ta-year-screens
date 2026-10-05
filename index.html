@@ -791,20 +791,14 @@ function hwCard(up) {
       if (g < 0) { lines.push(label + ': choose the tutor group column.'); continue; }
       const r = summarise(t, k, g, vp.c);
       if (!r.used) { lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
-      if (r.yearOnly) lines.push(label + ': this export lists subject classes, not tutor groups, so it shows whole-year results only (no tutor group race).');
-      if (t.match) lines.push(label + ': tutor groups found for ' + t.match.matched + ' of ' + t.match.total + ' students by matching names with the Sparx report. The rest count in their year\'s totals only.');
-      else if (k === 'tassomai' && nameCols(t).first >= 0) lines.push(label + ': to show it by tutor group, choose this week\'s Sparx report in the Sparx box on this page first.');
+      if (!t.match && k === 'tassomai' && nameCols(t).first >= 0) lines.push(label + ': to show it by tutor group, choose this week\'s Sparx report in the Sparx box on this page first.');
       res[k] = { r, group: t.head[g], value: t.head[vp.c] }; const b = HW_BANDS[r.what];
       const oddTop = Object.entries(r.odd).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([x, n]) => '"' + x.slice(0, 20) + '" (' + n + ')').join(', ');
       if (oddTop) lines.push(label + ': some cells weren\'t numbers, for example ' + oddTop + '.');
       else if (r.blank === t.rows.length) lines.push(label + ': the "' + t.head[vp.c].replace(/\s+/g, ' ').slice(0, 40) + '" column is empty.');
-      lines.push(label + ': ' + YEARS.filter(y => r.years[y]).map(y => yearName(y) + ' ' + (b.unit === '%' ? fmtNum(r.years[y].breakdown[0].value) + '% on 100%' : 'average ' + fmtNum(r.years[y].average))).join(', '));
     }
     if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
-    const any = Object.values(res)[0].r;
-    const top = Object.entries(any.missed).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => '"' + k.slice(0, 20) + '" (' + n + ')').join(', ');
-    lines.unshift(any.used + ' students read' + (any.skipped ? '. ' + any.skipped + ' row' + (any.skipped === 1 ? ' was' : 's were') + ' left out (hidden groups, or a tutor group that wasn\'t recognised), for example ' + top : '') + '.');
-    say(lines.join('\n')); results = res; btn.disabled = false;
+    say(lines.length ? lines.join('\n') : 'Ready to upload.'); results = res; btn.disabled = false;
   };
   input.addEventListener('change', async () => {
     tables = null; results = null; btn.disabled = true; cols.hidden = true;
