@@ -100,7 +100,7 @@ Race and breakdown slides use the upload automatically when their title starts w
 | Upload | Race slide (per tutor group) | Breakdown slide (whole year) |
 |---|---|---|
 | Sparx Maths, Sparx Science | % of the class on 100% | On 100%, 75 to 99%, below 75%, not started |
-| Sparx Reader | Average points (R (AT)) | 300 plus, 150 to 299, 1 to 149, 0 points |
+| Sparx Reader | % of the class on 100% (R (AT) is a percentage on the report) | 300 plus, 150 to 299, 1 to 149, 0 points |
 | Tassomai | Average score | 500 plus, 300 to 499, 1 to 299, not started |
 
 ## Timetable and term dates

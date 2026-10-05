@@ -532,7 +532,7 @@ const XLSX_SRC = 'vendor/xlsx.full.min.js';
 // totals are saved (homework/<kind>), never student names. Race and breakdown slides titled "Sparx Maths" etc. use them.
 const HOMEWORK = {
   'sparx-maths': { at: 'M', name: 'Sparx Maths', col: 'Maths column', what: 'completion', value: [/math.*(compuls|complet|%)/i, /(compuls|complet|%).*math/i, /math/i] },
-  'sparx-reader': { at: 'R', name: 'Sparx Reader', col: 'Reader column', what: 'points', value: [/srp/i, /(reader|reading).*point/i, /point.*(reader|reading)/i, /reader|reading/i] },
+  'sparx-reader': { at: 'R', name: 'Sparx Reader', col: 'Reader column', what: 'completion', value: [/srp/i, /(reader|reading).*point/i, /point.*(reader|reading)/i, /reader|reading/i] },
   'sparx-science': { at: 'S', name: 'Sparx Science', col: 'Science column', what: 'completion', value: [/scien.*(compuls|complet|%)/i, /(compuls|complet|%).*scien/i, /scien/i] },
   'tassomai': { name: 'Tassomai', col: 'Score column', what: 'score', value: [/score/i, /points/i, /daily goal/i, /quiz/i] },
 };
