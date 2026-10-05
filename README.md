@@ -46,6 +46,45 @@ If `config.js` has no Supabase keys, the site runs in demo mode:
 | editor | Also edit the screens for the years in `screen_staff.years` (`all` = every year) |
 | admin | Edit everything, and manage year teams |
 
+## House points from Arbor
+
+House points are read from an Arbor **live feed** (a report published as CSV or JSON). They then replace the typed-in house points on every screen, and the editor shows them as automatic.
+
+1. **Make the report.** In Arbor, create a report of house points and publish it as a live feed.
+
+   Any of these shapes works:
+   - one row per student;
+   - one row per tutor group;
+   - one row per house.
+
+   The report needs:
+   - a points column, whose heading contains "Points", "Total" or "Score";
+   - **either** a House column **or** a tutor group column (for example "7B", where the letter gives the house).
+
+   A Year or tutor group column also splits the totals by year. Without one, every year shows whole-school totals.
+2. **Add Vercel environment variables.** In Vercel, open Project, Settings, Environment Variables, and add:
+
+   | Variable | Value |
+   |---|---|
+   | `ARBOR_HOUSEPOINTS_FEED_URL` | the feed address (keep it secret) |
+   | `SUPABASE_URL` | the screens project URL |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase: Project Settings, API, service_role (secret, server only) |
+   | `CRON_SECRET` | any long random string |
+
+   Then redeploy.
+3. **Test it.** Run:
+
+   ```
+   curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-site>.vercel.app/api/sync-house-points
+   ```
+
+   The reply shows which columns it used and the totals. It never shows student rows.
+4. **Choose how often it runs.**
+   - Vercel's free plan runs the sync once a day, at 7am on weekdays.
+   - To run it every 10 minutes during the school day, fill in and run `supabase/schedule.sql` in the screens' Supabase project.
+
+If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
+
 ## Next lessons (Arbor)
 
 The "Up next" panel reads the `screen_docs` row `lessons/y7` (one per year), in this shape:
@@ -67,5 +106,7 @@ Bell times are set in `BELLS` near the top of the script in `index.html`. They a
 | `backend.js` | Supabase (live) or demo data, sign-in and image storage |
 | `config.js` | Supabase URL and anon key |
 | `supabase/schema.sql` | Database setup |
+| `supabase/schedule.sql` | Optional 10-minute house points refresh |
+| `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |
 | `media/` | House mascots, Keep TA Tidy posters, logo |
 | `data/demo.json` | Demo-mode sample data |

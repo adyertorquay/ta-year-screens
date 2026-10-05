@@ -448,15 +448,20 @@ function hasContent(s, centre) {
 
 // ---------- data ----------
 let db = null, assets = null, user = null, dbState = 'loading';
-const store = { screens: {}, lessons: {}, seen: {}, mascots: null };
+const store = { screens: {}, lessons: {}, seen: {}, mascots: null, rawCentre: {}, hp: {} };
+// House points synced from Arbor (housepoints/<year>, else housepoints/all) replace the typed-in ones.
+const syncedHP = y => { const d = store.hp[y] || store.hp.all; return d && d.points ? d : null; };
+function withHP(y) { const raw = store.rawCentre[y], hp = syncedHP(y); store.screens[y] = hp ? Object.assign({}, raw || {}, { housePoints: hp.points }) : raw; }
 const subs = {};
 const listeners = new Set();
 function subscribe(y) {
   if (!db || subs[y]) return;
+  if (!subs._hpall) subs._hpall = db.doc('housepoints/all').onSnapshot(s => { store.hp.all = s.exists ? s.data() : null; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('hp', e));
   if (!subs._config) subs._config = db.doc('config/houses').onSnapshot(s => { store.mascots = s.exists ? (s.data().mascots || null) : null; YEARS.forEach(emit); }, e => console.warn('config', e));
   subs[y] = [
     ...['left', 'right'].map(side => db.doc('screens/' + y + '-' + side).onSnapshot(s => { store.screens[y + '-' + side] = s.exists ? s.data() : null; emit(y); }, e => console.warn('side', e))),
-    db.doc('screens/' + y).onSnapshot(s => { store.screens[y] = s.exists ? s.data() : null; store.seen[y] = true; emit(y); }, e => console.warn('screen', e)),
+    db.doc('screens/' + y).onSnapshot(s => { store.rawCentre[y] = s.exists ? s.data() : null; withHP(y); store.seen[y] = true; emit(y); }, e => console.warn('screen', e)),
+    db.doc('housepoints/' + y).onSnapshot(s => { store.hp[y] = s.exists ? s.data() : null; withHP(y); emit(y); }, e => console.warn('hp', e)),
     db.doc('lessons/' + y).onSnapshot(s => { store.lessons[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('lessons', e)),
   ];
 }
@@ -1097,9 +1102,13 @@ function viewEdit(y) {
       field('Lines', 'ticker', (draft.ticker || []).join('\n'), v => draft.ticker = v.split('\n'), 'textarea', { rows: 4 })));
 
     // House points
+    const hpSync = syncedHP(y);
+    const hpBox = h('div', { class: 'houses-form' }, HOUSES.map(([n, c]) => h('div', { style: '--hc:' + c },
+      field(n, 'hp-' + n, draft.housePoints[n] ?? 0, v => draft.housePoints[n] = v, 'number', { min: 0, inputmode: 'numeric' }))));
+    if (hpSync) hpBox.querySelectorAll('input').forEach(el => { el.disabled = true; });
     form.append(h('fieldset', {}, h('legend', { text: 'House points' }),
-      h('div', { class: 'houses-form' }, HOUSES.map(([n, c]) => h('div', { style: '--hc:' + c },
-        field(n, 'hp-' + n, draft.housePoints[n] ?? 0, v => draft.housePoints[n] = v, 'number', { min: 0, inputmode: 'numeric' }))))));
+      hpSync ? h('p', { class: 'hint', text: 'These come from Arbor automatically' + (hpSync.syncedAt ? ', last updated ' + new Date(hpSync.syncedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '') + '.' }) : null,
+      hpBox));
 
     // Settings
     form.append(h('fieldset', {}, h('legend', { text: 'Screen settings' }),
