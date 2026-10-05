@@ -550,6 +550,20 @@ const HOMEWORK = {
   'sparx-science': { at: 'S', name: 'Sparx Science', col: 'Science column', what: 'completion', value: [/scien.*(compuls|complet|%)/i, /(compuls|complet|%).*scien/i, /scien/i] },
   'tassomai': { name: 'Tassomai', col: 'Score column', what: 'score', value: [/score/i, /points/i, /daily goal/i, /quiz/i] },
 };
+// When each homework is set and due, counted from the Monday of its Sparx week ("Set w/c 28/09/2026").
+// From the school's homework summary: Maths and Science are set Wednesday 6am and due the next Tuesday 11.30am;
+// Reader is set Friday 4.15pm and due the next Thursday 11.30am. So on a Wednesday or Thursday, Maths and Science
+// already show the new week while Reader still shows last week's.
+const HW_SCHEDULE = {
+  'sparx-maths': { set: [2, 6, 0], due: [8, 11, 30] },
+  'sparx-science': { set: [2, 6, 0], due: [8, 11, 30] },
+  'sparx-reader': { set: [4, 16, 15], due: [10, 11, 30] },
+};
+const wcDate = x => { const m = String(x).match(/w\/c\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/i); if (!m) return null;
+  const yr = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return new Date(yr, +m[2] - 1, +m[1]); };
+const atTime = (mon, [d, hh, mm]) => new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + d, hh, mm);
+// The set and due times of the homework in a column, when its heading carries the week.
+const hwDates = (kind, head) => { const sc = HW_SCHEDULE[kind], mon = sc && wcDate(head); return mon ? { set: atTime(mon, sc.set), due: atTime(mon, sc.due) } : null; };
 const HW_BANDS = {
   completion: { col: 'Completion column', metric: '% of class on 100%', unit: '%', bands: [['On 100%', v => v >= 100], ['75 to 99%', v => v >= 75], ['Below 75%', v => v > 0], ['Not started', () => true]] },
   points: { col: 'Points column', metric: 'Average points', unit: '', bands: [['300 plus', v => v >= 300], ['150 to 299', v => v >= 150], ['1 to 149', v => v > 0], ['0 points', () => true]] },
@@ -561,13 +575,15 @@ const HW_HIDDEN_GROUPS = ['10PFH', '11JAG'];
 const hwHidden = (y, L) => HW_HIDDEN_GROUPS.includes(y.slice(1) + L);
 // Which upload a slide reads: chosen in the editor, or guessed from its title.
 const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWORK).find(([, k]) => new RegExp('^\\s*' + k.name + '\\b', 'i').test(s.title || '')) || [''])[0];
+// "· due Tue 6 Oct" on homework slides (worked out from the column heading for uploads saved before this was stored).
+const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
 function hwSlide(y, s) {
   if (s.type !== 'stat' && s.type !== 'breakdown') return s;
   const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
   if (!yd) return s;
   const b = HW_BANDS[d.what || HOMEWORK[kind].what];
-  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).filter(L => !hwHidden(y, L)).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric, unit: b.unit })
-    : Object.assign({}, s, { segments: yd.breakdown, metric: 'Whole year' });
+  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).filter(L => !hwHidden(y, L)).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric + dueNote(kind, d), unit: b.unit })
+    : Object.assign({}, s, { segments: yd.breakdown, metric: 'Whole year' + dueNote(kind, d) });
 }
 const agoText = iso => { const m = Math.max(0, (Date.now() - Date.parse(iso)) / 60000);
   return m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 60 * 24 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
@@ -627,8 +643,14 @@ function guessGroup(t) {
 const weekNo = x => { const m = String(x).match(/week\s*(\d+)/i); return m ? +m[1] : -1; };
 const guessValue = (t, kind, g) => {
   const at = HOMEWORK[kind].at;
-  if (at) { // the newest week that has any results yet
+  if (at) {
     const all = t.head.map((x, i) => ({ x, i })).filter(({ x, i }) => i !== g && new RegExp('(^|· )' + at + '\\s*\\(AT\\)\\s*$', 'i').test(x));
+    // Each subject shows the homework running now (set, not yet due); between homeworks, the one just due.
+    const now = new Date(), dated = all.map(c => Object.assign({}, c, hwDates(kind, c.x))).filter(c => c.set);
+    const live = dated.filter(c => c.set <= now && now < c.due), done = dated.filter(c => c.due <= now);
+    const pick = live.length ? live.reduce((a, c) => c.set > a.set ? c : a) : done.length ? done.reduce((a, c) => c.due > a.due ? c : a) : null;
+    if (pick) return pick.i;
+    // Headings without dates: the newest week that has any results yet.
     const used = all.filter(({ i }) => t.rows.some(r => String(r[i] ?? '').trim())), cands = used.length ? used : all;
     if (cands.length) return cands.reduce((a, c) => weekNo(c.x) >= weekNo(a.x) ? c : a).i;
   }
@@ -733,7 +755,7 @@ function hwCard(up) {
     btn.disabled = true; say('Saving…');
     try {
       const at = new Date().toISOString();
-      for (const [k, x] of Object.entries(results)) await db.doc('homework/' + k).set({ uploadedAt: at, rows: x.r.used, groupColumn: x.group, valueColumn: x.value, what: x.r.what, years: x.r.years });
+      for (const [k, x] of Object.entries(results)) await db.doc('homework/' + k).set({ uploadedAt: at, rows: x.r.used, groupColumn: x.group, valueColumn: x.value, what: x.r.what, years: x.r.years, due: (d => d ? todayISO(d.due) : '')(hwDates(k, x.value)) });
       input.value = ''; cols.hidden = true; tables = null;
       say('Saved ' + Object.keys(results).map(k => HOMEWORK[k].name).join(', ') + '. The screens update in a few seconds.'); results = null;
     } catch (e) { say(e && e.code === 'invalid_argument' ? 'You don\'t have permission to upload reports.' : 'Saving failed. Try again.', true); btn.disabled = false; }

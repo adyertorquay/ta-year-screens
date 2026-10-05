@@ -108,6 +108,10 @@ Race and breakdown slides use the upload automatically when their title starts w
 | Sparx Reader | % of the class on 100% (R (AT) is a percentage on the report) | On 100%, 75 to 99%, below 75%, not started |
 | Tassomai | Average score | 500 plus, 300 to 499, 1 to 299, not started |
 
+### Which week each subject shows
+
+The Sparx report has a block of columns per week ("Week 5, Set w/c 28/09/2026"). Each subject picks its own block from the upload time and the homework timetable (`HW_SCHEDULE` in `index.html`): Maths and Science are set Wednesday 6am and due the next Tuesday 11.30am, and Reader is set Friday 4.15pm and due the next Thursday 11.30am. The page uses the homework running at upload time, or between homeworks the one just due. So an upload on a Wednesday shows the new week's Maths and Science and the previous week's Reader. Slides show the due date (for example "due Tue 6 Oct"). The column can still be changed by hand before saving. Tassomai isn't dated yet because no real export has been seen.
+
 ## Timetable and term dates
 
 "Up next" shows every class in the year for the next period, from the Week A and Week B timetables. The week slide shows "Week B, Teaching week 5", "Assessment week" and so on by itself when its fields are left blank.
