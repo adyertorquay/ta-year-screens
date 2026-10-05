@@ -549,7 +549,7 @@ function hwSlide(y, s) {
   const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
   if (!yd) return s;
   const b = HW_BANDS[d.what || HOMEWORK[kind].what];
-  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, metric: b.metric, unit: b.unit })
+  return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric, unit: b.unit })
     : Object.assign({}, s, { segments: yd.breakdown, metric: 'Whole year' });
 }
 const agoText = iso => { const m = Math.max(0, (Date.now() - Date.parse(iso)) / 60000);
@@ -581,9 +581,9 @@ async function readBook(file) {
   return tables;
 }
 const AT_RX = /^\s*[MRS]\s*\(AT\)\s*$/i;
-const GROUP_RX = /(?:^|[^0-9])0?(7|8|9|10|11)\s*[-/.]?\s*([A-Z]{1,2}\d?)(?![A-Za-z])/i;
+const GROUP_RX = /(?:^|[^0-9])0?(7|8|9|10|11)\s*[-/.]?\s*([A-Z]{1,3}\d?)(?![A-Za-z])/i;
 const HOUSE_RX = new RegExp('(?:^|[^0-9])0?(7|8|9|10|11)\\D{0,8}?(' + HOUSES.map(x => x[0]).join('|') + ')', 'i');
-// "7B", "07B", "7-B", "Year 7 B", "11Q5" or "7 Brunel" -> { y: 'y7', L: 'B' }
+// "7B", "07B", "7-B", "Year 7 B", "11Q5", "11JEM" or "7 Brunel" -> { y: 'y7', L: 'B' }
 const parseGroup = v => {
   const t = String(v ?? '').replace(/\b(year|yr)\s*/gi, '').trim();
   const hm = t.match(HOUSE_RX); if (hm) return { y: 'y' + hm[1], L: hm[2][0].toUpperCase() };
@@ -621,6 +621,7 @@ function summarise(t, kind, g, v) {
   const what = HOMEWORK[kind].what;
   const b = HW_BANDS[what];
   const vals = t.rows.map(r => ({ grp: String(r[g] ?? ''), v: toNum(r[v]) }));
+  const odd = {}; t.rows.forEach(r => { const x = String(r[v] ?? '').trim(); if (x && toNum(r[v]) == null) odd[x] = (odd[x] || 0) + 1; });
   if (b.unit === '%') { // Excel percentages arrive as 0 to 1
     const nums = vals.map(x => x.v).filter(x => x != null);
     if (nums.length && nums.every(x => x <= 1) && nums.some(x => x > 0 && x < 1)) vals.forEach(x => { if (x.v != null) x.v *= 100; });
@@ -637,7 +638,7 @@ function summarise(t, kind, g, v) {
   for (const [y, Y] of Object.entries(years)) out[y] = { students: Y.n, average: Math.round(Y.sum / Y.n),
     groups: Object.fromEntries(Object.entries(Y.groups).map(([L, G]) => [L, b.unit === '%' ? round1(G.top / G.n * 100) : Math.round(G.sum / G.n)])),
     breakdown: b.bands.map(([label], k) => ({ label, value: round1(Y.band[k] / Y.n * 100) })) };
-  return { years: out, used, skipped: t.rows.length - used, missed, what };
+  return { years: out, used, skipped: t.rows.length - used, missed, odd, blank: t.rows.filter(r => !String(r[v] ?? '').trim()).length, what };
 }
 // One upload per report: Sparx is a single report covering Maths, Reader and Science.
 const HW_UPLOADS = [
@@ -680,6 +681,9 @@ function hwCard(up) {
       const r = summarise(t, k, g, vp.c);
       if (!r.used) { lines.push(label + ': no tutor groups like 7B or 11Q5 were found.'); continue; }
       res[k] = { r, group: t.head[g], value: t.head[vp.c] }; const b = HW_BANDS[r.what];
+      const oddTop = Object.entries(r.odd).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([x, n]) => '"' + x.slice(0, 20) + '" (' + n + ')').join(', ');
+      if (oddTop) lines.push(label + ': some cells weren\'t numbers, for example ' + oddTop + '.');
+      else if (r.blank === t.rows.length) lines.push(label + ': the "' + t.head[vp.c].replace(/\s+/g, ' ').slice(0, 40) + '" column is empty.');
       lines.push(label + ': ' + YEARS.filter(y => r.years[y]).map(y => yearName(y) + ' ' + (b.unit === '%' ? fmtNum(r.years[y].breakdown[0].value) + '% on 100%' : 'average ' + fmtNum(r.years[y].average))).join(', '));
     }
     if (!Object.keys(res).length) return say(lines.join('\n') || 'Choose the columns to use.', true);
@@ -1185,7 +1189,7 @@ class PortraitStage {
           : h('div', { class: 'p-empty', text: s.emptyText || 'Nobody listed yet.' })));
       }
       case 'stat': {
-        const rows = groupsOf(this.centre).map(L => ({ g: yn + L, letter: L, v: +((s.values || {})[L]) || 0, c: suffixColor(L) }));
+        const rows = (s.groupList || groupsOf(this.centre)).map(L => ({ g: yn + L, letter: L, v: +((s.values || {})[L]) || 0, c: suffixColor(L) }));
         const max = s.unit === '%' ? 100 : Math.max(1, ...rows.map(r => r.v)) * 1.08;
         return wrap('p-stat', pad(...head(s.metric, s.title), h('div', { class: 'stat-rows' + (rows.length > 8 ? ' many' : '') }, raceRows(rows, max, s.unit))));
       }
