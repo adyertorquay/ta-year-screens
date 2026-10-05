@@ -1631,14 +1631,7 @@ function viewEdit(y) {
       h('p', { class: 'hint', text: 'Trips, competitions, achievements. Celebrations set to All year groups show on every year\'s screen and can be edited from any year. A photo fills the slide; without one it shows as a bold colour card. Check photo consent before uploading.' }),
       cList, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { draft.celebrations.push({ id: uid(), title: '', caption: '', photo: '', all: true }); touch(); renderC(); }, text: 'Add celebration' })));
 
-    // House points
-    const hpSync = syncedHP(y);
-    const hpBox = h('div', { class: 'houses-form' }, HOUSES.map(([n, c]) => h('div', { style: '--hc:' + c },
-      field(n, 'hp-' + n, draft.housePoints[n] ?? 0, v => draft.housePoints[n] = v, 'number', { min: 0, inputmode: 'numeric' }))));
-    if (hpSync) hpBox.querySelectorAll('input').forEach(el => { el.disabled = true; });
-    form.append(h('fieldset', {}, h('legend', { text: 'House points' }),
-      hpSync ? h('p', { class: 'hint', text: 'These come from Arbor automatically' + (hpSync.syncedAt ? ', last updated ' + new Date(hpSync.syncedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '') + '.' }) : null,
-      hpBox));
+    // House points aren't typed in here: they come from Arbor (or Supabase) into housePoints.
 
     // Settings
     form.append(h('fieldset', {}, h('legend', { text: 'Screen settings' }),
