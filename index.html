@@ -594,6 +594,8 @@ const colShare = (t, i, f) => { const s = t.rows.slice(0, 300).map(r => r[i]).fi
 const isGroupCol = (t, i) => colShare(t, i, v => GROUP_RX.test(String(v))) > 0.6;
 const isNumCol = (t, i) => colShare(t, i, v => toNum(v) != null) > 0.6;
 function guessGroup(t) {
+  const reg = t.head.findIndex(x => /^reg\.?\s*group$/i.test(x)); // Sparx's tutor group column
+  if (reg >= 0) return reg;
   for (const rx of [/tutor|form|reg/i, /group|class/i, /./]) { const g = t.head.findIndex((x, i) => rx.test(x) && isGroupCol(t, i)); if (g >= 0) return g; }
   return -1;
 }
@@ -608,9 +610,7 @@ const guessValue = (t, kind, g) => {
   for (const rx of HOMEWORK[kind].value) { const v = t.head.findIndex((x, i) => i !== g && rx.test(t.sheet + ' ' + x) && isNumCol(t, i)); if (v >= 0) return v; } return -1; };
 const round1 = v => Math.round(v * 10) / 10;
 function summarise(t, kind, g, v) {
-  const raw = t.rows.map(r => r[v]).filter(x => String(x ?? '').trim());
-  const pct = /\(AT\)|%/.test(t.head[v]) || (raw.length && raw.filter(x => /%\s*$/.test(String(x))).length / raw.length > 0.5);
-  const what = HOMEWORK[kind].what === 'points' && pct ? 'completion' : HOMEWORK[kind].what;
+  const what = HOMEWORK[kind].what;
   const b = HW_BANDS[what];
   const vals = t.rows.map(r => ({ grp: String(r[g] ?? ''), v: toNum(r[v]) }));
   if (b.unit === '%') { // Excel percentages arrive as 0 to 1
