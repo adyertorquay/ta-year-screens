@@ -836,7 +836,7 @@ function gateEdit(y, open) {
 let currentAccess = null;
 function editorWho() {
   const a = currentAccess; if (!a || !a.me) return null;
-  return h('div', { style: 'display:flex;gap:8px;align-items:center' }, whoChip(a.me), a.admin ? h('a', { class: 'btn ghost', href: '#staff', text: 'Year teams' }) : null, signOutLink());
+  return h('div', { style: 'display:flex;gap:8px;align-items:center' }, whoChip(a.me), signOutLink());
 }
 
 // Year teams: admins choose which years each editor may edit.
