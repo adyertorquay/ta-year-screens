@@ -1701,8 +1701,8 @@ function editorTop(y, side) {
   const link = (yy, s) => '#edit-' + yy + (s === 'centre' ? '' : '-' + s);
   return h('div', { style: 'display:flex;flex-direction:column;gap:14px' },
     h('div', { class: 'topbar' },
-      h('div', { class: 'brand' }, stripe(), h('h1', { text: 'Edit ' + yearName(y) + ' screens' })),
-      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, h('nav', { class: 'yeartabs', 'aria-label': 'Year groups' }, YEARS.filter(yy => !currentAccess || currentAccess.years.includes(yy)).map(yy => h('a', { href: link(yy, side), 'aria-current': yy === y ? 'page' : null, text: yearName(yy) }))), editorWho(), themeBtn())),
+      h('div', { class: 'brand' }, h('a', { href: '#', title: 'Home', 'aria-label': 'Home', style: 'display:flex' }, stripe()), h('h1', { text: 'Edit ' + yearName(y) + ' screens' })),
+      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, h('nav', { class: 'yeartabs', 'aria-label': 'Year groups' }, YEARS.filter(yy => !currentAccess || currentAccess.years.includes(yy)).map(yy => h('a', { href: link(yy, side), 'aria-current': yy === y ? 'page' : null, text: yearName(yy) }))), editorWho(), h('a', { class: 'btn ghost', href: '#', text: 'Home' }), themeBtn())),
     h('nav', { class: 'screentabs', 'aria-label': 'Screens' }, [['left', 'Left screen'], ['centre', 'Centre screen'], ['right', 'Right screen']].map(([s, t]) => h('a', { href: link(y, s), 'aria-current': s === side ? 'page' : null, text: t }))));
 }
 
