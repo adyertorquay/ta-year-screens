@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Year Group Screens</title>
+<title>TA Screens</title>
 <link rel="icon" type="image/png" href="media/ta-logo.png">
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -798,7 +798,7 @@ function signOutLink() {
 }
 function signinShell(...kids) {
   return h('div', { class: 'signin' }, h('div', { class: 'signin-card' }, logoImg(),
-    h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }), ...kids,
+    h('h1', { text: 'TA Screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }), ...kids,
     h('div', { class: 'foot' }, themeBtn('linkish'), signOutLink()),
     h('div', { class: 'values', text: VALUES_LINE })));
 }
@@ -1366,7 +1366,7 @@ function viewHome() {
     return card;
   });
   app.append(h('div', { class: 'wrap' },
-    h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'Year group screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
+    h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'TA Screens' }), h('div', { class: 'tagline', text: 'everyone succeeds' }))),
       h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('a', { class: 'btn primary', href: '#', text: 'Edit screens' }), themeBtn())),
     h('div', { class: 'years' }, cards)));
   YEARS.forEach(subscribe);
