@@ -89,7 +89,7 @@ If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `
 
 Signed-in staff who can edit see a **Homework reports** section on the home page, with two uploads: **Sparx** (one report covering Maths, Reader and Science) and **Tassomai**.
 
-1. Export the report as Excel or CSV, with one row per student. The Sparx columns can be on one sheet or on separate Maths, Reader and Science sheets.
+1. Export the report as Excel or CSV, with one row per student. The Sparx columns can be on one sheet or on separate Maths, Reader and Science sheets. For the Sparx report it uses the **M (AT)**, **R (AT)** and **S (AT)** columns (Maths, Reader, Science) under the newest "Week N" heading that has any results, so it keeps working as new weeks are added.
 2. Choose the file. The page guesses the tutor group column (for example 7B or 11Q5) and the Maths, Reader, Science or score columns, using the column and sheet names. Change them in the drop-downs if needed; "Not in this file" skips one. A summary for each year shows before anything is saved.
 3. Press Upload.
 
@@ -100,7 +100,7 @@ Race and breakdown slides use the upload automatically when their title starts w
 | Upload | Race slide (per tutor group) | Breakdown slide (whole year) |
 |---|---|---|
 | Sparx Maths, Sparx Science | % of the class on 100% | On 100%, 75 to 99%, below 75%, not started |
-| Sparx Reader | Average points | 300 plus, 150 to 299, 1 to 149, 0 points |
+| Sparx Reader | % of the class on 100% from R (AT); average points if a points column is chosen instead | 300 plus, 150 to 299, 1 to 149, 0 points |
 | Tassomai | Average score | 500 plus, 300 to 499, 1 to 299, not started |
 
 ## Timetable and term dates
