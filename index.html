@@ -374,6 +374,17 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
   .editor.side-right .preview { align-items: flex-end; } /* the right screen's preview sits on the right, like the TV */ }
 .pv-badge { position: fixed; left: 12px; bottom: 12px; z-index: 50; background: #111; color: #fff; font: 700 14px/1 var(--body); padding: 8px 12px; border-radius: 8px; opacity: .85; pointer-events: none; }
 .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+/* Armistice Day: screens turn grey, with a red poppy that stays in colour */
+.stage.remember { --glow-1: transparent; --glow-2: transparent; }
+.stage.remember > :not(.p-spot):not(.fx-poppy):not(.fx), .stage.remember .p-spot > .spot-dots, .stage.remember .p-spot .slide:not(.aw-armistice) { filter: grayscale(1); }
+.fx-poppy { position: absolute; left: 1150px; top: 24px; width: 112px; z-index: 21; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+.portrait .fx-poppy { width: 100px; left: 646px; top: 44px; }
+.fx-poppy svg, .to-poppy svg { width: 100%; height: auto; display: block; }
+.fx-poppy svg *, .to-poppy svg * { transform-box: view-box; transform-origin: 200px 200px; }
+.takeover.remembrance { background: radial-gradient(circle at 50% 40%, #2a2224, #141012 60%, #050405 100%); animation: to-in 2.5s ease-out; }
+.takeover.remembrance .to-text { animation: none; }
+.takeover.remembrance .to-sub { color: #E8A0A8; font-size: 3.4vmin; letter-spacing: .12em; }
+.to-poppy { width: 30vmin; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
 .aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
@@ -435,13 +446,15 @@ const BELLS = [
   { p: 'P5', label: 'Period 5', start: '15:15' },
 ];
 // Full-screen messages every TV shows at set times on school days (Monday to Friday), for `minutes` minutes.
+// An entry with a `date` shows on that day only (any weekday), and `kind` gives it its own look.
 const TAKEOVERS = [
   { at: '08:15', minutes: 2, text: 'Go To Line Up 1' },
+  { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
 ];
 function activeTakeover(now = new Date()) {
-  const wd = now.getDay(); if (wd < 1 || wd > 5) return null;
-  const m = now.getHours() * 60 + now.getMinutes();
-  return TAKEOVERS.find(t => m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
+  const wd = now.getDay(), day = effDay(now);
+  const m = previewTime != null ? previewTime : now.getHours() * 60 + now.getMinutes();
+  return TAKEOVERS.find(t => (t.date ? t.date === day : wd >= 1 && wd <= 5) && m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
 }
 const MOTTO = 'every second counts';
 
@@ -1103,23 +1116,26 @@ const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.te
 // Light effects drawn over every screen on certain days. Fireworks Night: one small firework every few seconds,
 // in the top part of the screen, gone in under two seconds. Turned off when the device asks for reduced motion.
 // A screen link ending in @YYYY-MM-DD (#y7-right@2026-11-05) previews that day's posters and effects.
-let previewDate = null;
+// Add a time too (#y7@2026-11-11T10:59) to hold the screen at that time of day, for full-screen messages.
+let previewDate = null, previewTime = null;
 const effDay = now => previewDate || todayISO(now);
 const EFFECTS = [
   { key: 'fireworks', from: '2026-11-05', to: '2026-11-05' }, // Fireworks Night
   { key: 'snow', from: '2026-12-14', to: '2026-12-18' }, // last week of term before Christmas
+  { key: 'remembrance', from: '2026-11-11', to: '2026-11-11' }, // Armistice Day: grey screens and a red poppy
 ];
 const todaysEffect = (now = new Date()) => { const t = effDay(now); return EFFECTS.find(e => t >= e.from && t <= e.to) || null; };
 class Effects {
   constructor(host) { this.host = host; this.cur = null; this.parts = []; this.check(); this.timer = setInterval(() => this.check(), 60000); }
   check() {
-    const e = matchMedia('(prefers-reduced-motion: reduce)').matches ? null : todaysEffect();
+    let e = todaysEffect(); if (e && e.key !== 'remembrance' && matchMedia('(prefers-reduced-motion: reduce)').matches) e = null; // grey screens aren't motion
     const k = e ? e.key : null; if (k === this.cur) return;
     this.off(); this.cur = k;
     if (k === 'fireworks') this.fireworks();
     if (k === 'snow') this.snow();
+    if (k === 'remembrance') { this.host.classList.add('remember'); const p = this.cv = h('div', { class: 'fx-poppy' }); p.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art; this.host.append(p); }
   }
-  off() { clearTimeout(this.next); cancelAnimationFrame(this.raf); this.raf = 0; if (this.cv) this.cv.remove(); this.cv = null; this.parts = []; }
+  off() { this.host.classList.remove('remember'); clearTimeout(this.next); cancelAnimationFrame(this.raf); this.raf = 0; if (this.cv) this.cv.remove(); this.cv = null; this.parts = []; }
   stop() { clearInterval(this.timer); this.off(); }
   // Snow: a few dozen slow flakes drifting down over the whole screen. White with a faint blue edge so they show in light mode too.
   snow() {
@@ -1609,7 +1625,8 @@ function route() {
   document.body.classList.remove('tv');
   app.replaceChildren();
   const [hash, pv] = location.hash.slice(1).split('@');
-  previewDate = /^\d{4}-\d{2}-\d{2}$/.test(pv || '') ? pv : null;
+  const pm = /^(\d{4}-\d{2}-\d{2})(?:T(\d{1,2}):(\d{2}))?$/.exec(pv || '');
+  previewDate = pm ? pm[1] : null; previewTime = pm && pm[2] ? +pm[2] * 60 + +pm[3] : null;
   // Nothing shows until a signed-in viewer's data access is confirmed.
   if (dbState !== 'on') return viewLogin(dbState === 'loading' ? { state: 'loading' } : { state: 'signedout' });
   const m = /^(edit-)?(y7|y8|y9|y10|y11)(?:-(left|right))?$/.exec(hash);
@@ -1617,7 +1634,7 @@ function route() {
     const [, edit, y, side] = m;
     if (edit) return gateEdit(y, () => side ? viewEditSide(y, side) : viewEdit(y));
     viewScreen(y, side || null);
-    if (previewDate) app.append(h('div', { class: 'pv-badge', text: 'Preview of ' + fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }));
+    if (previewDate) app.append(h('div', { class: 'pv-badge', text: 'Preview of ' + fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (previewTime != null ? ' at ' + pv.split('T')[1] : '') }));
     return;
   }
   if (hash === 'staff') return viewStaff();
@@ -1697,13 +1714,17 @@ function viewScreen(y, side) {
     else stage.setData(store.screens[y], store.lessons[y]);
   };
   listeners.add(fill); subscribe(y); fill();
-  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
   app.append(takeover);
   let shown = null;
   const checkTakeover = () => {
     const t = activeTakeover();
     if (t === shown) return; shown = t;
-    takeover.hidden = !t; if (t) $('.to-text', takeover).textContent = t.text;
+    takeover.hidden = !t; if (!t) return;
+    $('.to-text', takeover).textContent = t.text; $('.to-sub', takeover).textContent = t.sub || VALUES_LINE;
+    takeover.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
+    poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', takeover).hidden = t.kind === 'remembrance';
   };
   checkTakeover(); const toTimer = setInterval(checkTakeover, 1000);
   let lock = null;
