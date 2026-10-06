@@ -548,7 +548,7 @@ function hasContent(s, centre) {
 
 // ---------- data ----------
 let db = null, assets = null, user = null, dbState = 'loading';
-const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {} };
+const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {}, bdays: {} };
 // House points synced from Arbor (housepoints/<year>, else housepoints/all) replace the typed-in ones.
 const syncedHP = y => { const d = store.hp[y] || store.hp.all; return d && d.points ? d : null; };
 // Whole-school celebrations (celebrations/all) show on every year's centre screen, before the year's own.
@@ -572,6 +572,7 @@ function subscribe(y) {
     ...['left', 'right'].map(side => db.doc('screens/' + y + '-' + side).onSnapshot(s => { store.screens[y + '-' + side] = s.exists ? s.data() : null; emit(y); }, e => console.warn('side', e))),
     db.doc('screens/' + y).onSnapshot(s => { store.rawCentre[y] = s.exists ? s.data() : null; withHP(y); store.seen[y] = true; emit(y); }, e => console.warn('screen', e)),
     db.doc('housepoints/' + y).onSnapshot(s => { store.hp[y] = s.exists ? s.data() : null; withHP(y); emit(y); }, e => console.warn('hp', e)),
+    db.doc('birthdays/' + y).onSnapshot(s => { store.bdays[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('birthdays', e)),
     db.doc('lessons/' + y).onSnapshot(s => { store.lessons[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('lessons', e)),
     db.doc('timetable/' + y).onSnapshot(s => { store.timetable[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('timetable', e)),
   ];
@@ -622,6 +623,8 @@ const hwHidden = (y, L) => HW_HIDDEN_GROUPS.includes(y.slice(1) + L);
 const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWORK).find(([, k]) => new RegExp('^\\s*' + k.name + '\\b', 'i').test(s.title || '')) || [''])[0];
 // "· due Tue 6 Oct" on homework slides (worked out from the column heading for uploads saved before this was stored).
 const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
+// Birthdays synced from Arbor (birthdays/<year>, see api/sync-birthdays.js) replace the typed-in list.
+const bdaySlide = (y, s) => s.type === 'birthdays' && store.bdays[y] && store.bdays[y].source === 'arbor' ? Object.assign({}, s, { people: store.bdays[y].people || '' }) : s;
 function hwSlide(y, s) {
   if (s.type !== 'stat' && s.type !== 'breakdown') return s;
   const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
@@ -1477,7 +1480,7 @@ class PortraitStage {
   }
   destroy() { clearInterval(this.timer); this.fx.stop(); this.ro.disconnect(); this.fit.remove(); }
   setData(sideDoc, centreDoc, les) {
-    this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => hwSlide(this.year, x)) }); this.centre = normal(centreDoc); this.les = les || null;
+    this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => bdaySlide(this.year, hwSlide(this.year, x))) }); this.centre = normal(centreDoc); this.les = les || null;
     this.buildSlides(); this.renderNext(true);
   }
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
@@ -1977,7 +1980,7 @@ function viewEditSide(y, side) {
       }
       case 'table': body.append(F('Title', 'title'), F('Small heading (optional)', 'subtitle'), F('Rows', 'rows', 'textarea', { rows: 7, placeholder: 'Name\tTutor\tPoints' }, true)); break;
       case 'birthdays': body.append(F('Title', 'title', 'text', {}, true), F('Students, one per line ("Name, 7B, dd/mm")', 'people', 'textarea', { rows: 6 }, true),
-        h('p', { class: 'note wide', text: 'A stopgap: once connected, Arbor can supply birthdays automatically.' })); break;
+        h('p', { class: 'note wide', text: store.bdays[y] && store.bdays[y].source === 'arbor' ? 'Birthdays now come from Arbor automatically each morning, so this list is not used.' : 'Used until the Arbor birthdays feed is connected, then birthdays fill in automatically.' })); break;
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;

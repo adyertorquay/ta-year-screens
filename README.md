@@ -87,6 +87,24 @@ House points are read from an Arbor **live feed** (a report published as CSV or 
 
 If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
 
+## Birthdays from Arbor
+
+`api/sync-birthdays.js` reads an Arbor student report with the columns **Student, Year Group, Reg. Form, Next Birthday** (Age on Next Birthday is ignored) and fills the Birthdays slide on each year's right-hand screen. It runs every morning at 5am (UTC).
+
+Only these are saved, per year in `birthdays/<year>`: first name, surname initial, tutor group, and the day and month (for example "Amelia S, 7B, 07/10"). Ages and full dates of birth are never saved, and only birthdays from three days ago to a week ahead are kept. Sixth form rows are skipped.
+
+1. In Arbor, make the report a live feed and copy its address.
+2. In Vercel, add `ARBOR_BIRTHDAYS_FEED_URL` with that address (keep it secret). It uses the same `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` as the house points sync. Then redeploy.
+3. Test it:
+
+   ```
+   curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-site>.vercel.app/api/sync-birthdays
+   ```
+
+   The reply shows the columns it used and how many birthdays each year got. It never shows names.
+
+Once it has run, the typed-in list in the Birthdays slide editor is no longer used. If it picks the wrong column, set `ARBOR_STUDENT_COLUMN`, `ARBOR_YEAR_COLUMN`, `ARBOR_FORM_COLUMN` or `ARBOR_BIRTHDAY_COLUMN` to the exact heading.
+
 ## Celebrations for every year
 
 Each celebration has a "Show on" choice. "All year groups" (the default for new ones) saves it to `celebrations/all`, so it shows on every year's centre screen and can be edited from any year's editor. "Year N only" keeps it on that year's screen. Editors may write `celebrations/all` (see `supabase/schema.sql`).
@@ -156,6 +174,7 @@ Both of these are set near the top of the script in `index.html`:
 | `backend.js` | Supabase (live) or demo data, sign-in and image storage |
 | `config.js` | Supabase URL and anon key |
 | `supabase/schema.sql` | Database setup |
+| `api/sync-birthdays.js`, `lib/birthdays.js` | Daily Arbor birthdays sync |
 | `supabase/schedule.sql` | Optional 10-minute house points refresh |
 | `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |
 | `tools/build_timetable.py` | Arbor timetable exports to `timetable.sql` |
