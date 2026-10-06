@@ -372,6 +372,7 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .ycard .screens a { justify-content: center; padding-inline: 4px; min-width: 0; }
 @media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; }
   .editor.side-right .preview { align-items: flex-end; } /* the right screen's preview sits on the right, like the TV */ }
+.pv-badge { position: fixed; left: 12px; bottom: 12px; z-index: 50; background: #111; color: #fff; font: 700 14px/1 var(--body); padding: 8px 12px; border-radius: 8px; opacity: .85; pointer-events: none; }
 .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
@@ -1098,8 +1099,11 @@ const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.te
 // ---------- seasonal effects ----------
 // Light effects drawn over every screen on certain days. Fireworks Night: one small firework every few seconds,
 // in the top part of the screen, gone in under two seconds. Turned off when the device asks for reduced motion.
+// A screen link ending in @YYYY-MM-DD (#y7-right@2026-11-05) previews that day's posters and effects.
+let previewDate = null;
+const effDay = now => previewDate || todayISO(now);
 const EFFECTS = [{ key: 'fireworks', from: '2026-11-05', to: '2026-11-05' }];
-const todaysEffect = (now = new Date()) => { const t = todayISO(now); return EFFECTS.find(e => t >= e.from && t <= e.to) || null; };
+const todaysEffect = (now = new Date()) => { const t = effDay(now); return EFFECTS.find(e => t >= e.from && t <= e.to) || null; };
 class Effects {
   constructor(host) { this.host = host; this.cur = null; this.parts = []; this.check(); this.timer = setInterval(() => this.check(), 60000); }
   check() {
@@ -1191,10 +1195,10 @@ function awarenessShowDay(iso) {
   for (let k = 1; k <= 3; k++) { const p = new Date(d); p.setDate(d.getDate() - k); if (isSchoolDay(p)) return isoDay(p); }
   return iso;
 }
-const todaysAwareness = (now = new Date()) => { const t = todayISO(now); return AWARENESS_DAYS.find(a => a.date === t || awarenessShowDay(a.date) === t) || null; };
+const todaysAwareness = (now = new Date()) => { const t = effDay(now); return AWARENESS_DAYS.find(a => a.date === t || awarenessShowDay(a.date) === t) || null; };
 function awarenessEl(key) {
   const a = AWARENESS_DAYS.find(x => x.key === key);
-  const days = Math.round((new Date(a.date + 'T12:00:00') - new Date(todayISO() + 'T12:00:00')) / 864e5);
+  const days = Math.round((new Date(a.date + 'T12:00:00') - new Date(effDay() + 'T12:00:00')) / 864e5);
   const when = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : 'Coming up';
   const art = h('div', { class: 'aw-art' }); art.innerHTML = a.art; // fixed artwork from this file, never user text
   const [c1, c2, c3, c4] = a.colors;
@@ -1577,14 +1581,17 @@ function route() {
   cleanup(); cleanup = () => {};
   document.body.classList.remove('tv');
   app.replaceChildren();
-  const hash = location.hash.slice(1);
+  const [hash, pv] = location.hash.slice(1).split('@');
+  previewDate = /^\d{4}-\d{2}-\d{2}$/.test(pv || '') ? pv : null;
   // Nothing shows until a signed-in viewer's data access is confirmed.
   if (dbState !== 'on') return viewLogin(dbState === 'loading' ? { state: 'loading' } : { state: 'signedout' });
   const m = /^(edit-)?(y7|y8|y9|y10|y11)(?:-(left|right))?$/.exec(hash);
   if (m) {
     const [, edit, y, side] = m;
     if (edit) return gateEdit(y, () => side ? viewEditSide(y, side) : viewEdit(y));
-    return viewScreen(y, side || null);
+    viewScreen(y, side || null);
+    if (previewDate) app.append(h('div', { class: 'pv-badge', text: 'Preview of ' + fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }));
+    return;
   }
   if (hash === 'staff') return viewStaff();
   // The home page is the year chooser; every screen and the homework uploads are under All screens.

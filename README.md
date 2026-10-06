@@ -13,6 +13,7 @@ It's a static site (no build step), hosted on Vercel, with data and sign-in in i
 | `/#homework` | Homework: Sparx and Tassomai uploads (linked from the home page) |
 | `/#y7` | Year 7 centre screen (landscape TV) |
 | `/#y7-left`, `/#y7-right` | Year 7 portrait screens |
+| `/#y7-right@2026-11-05` | Any screen link with `@date` on the end previews that day's posters and effects |
 | `/#edit-y7`, `/#edit-y7-left`, `/#edit-y7-right` | Editors for those screens |
 | `/#staff` | Year teams: who can edit which year (admins only; not linked from the pages, type the address) |
 
