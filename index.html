@@ -1102,7 +1102,10 @@ const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.te
 // A screen link ending in @YYYY-MM-DD (#y7-right@2026-11-05) previews that day's posters and effects.
 let previewDate = null;
 const effDay = now => previewDate || todayISO(now);
-const EFFECTS = [{ key: 'fireworks', from: '2026-11-05', to: '2026-11-05' }];
+const EFFECTS = [
+  { key: 'fireworks', from: '2026-11-05', to: '2026-11-05' }, // Fireworks Night
+  { key: 'snow', from: '2026-12-14', to: '2026-12-18' }, // last week of term before Christmas
+];
 const todaysEffect = (now = new Date()) => { const t = effDay(now); return EFFECTS.find(e => t >= e.from && t <= e.to) || null; };
 class Effects {
   constructor(host) { this.host = host; this.cur = null; this.parts = []; this.check(); this.timer = setInterval(() => this.check(), 60000); }
@@ -1111,9 +1114,30 @@ class Effects {
     const k = e ? e.key : null; if (k === this.cur) return;
     this.off(); this.cur = k;
     if (k === 'fireworks') this.fireworks();
+    if (k === 'snow') this.snow();
   }
   off() { clearTimeout(this.next); cancelAnimationFrame(this.raf); this.raf = 0; if (this.cv) this.cv.remove(); this.cv = null; this.parts = []; }
   stop() { clearInterval(this.timer); this.off(); }
+  // Snow: a few dozen slow flakes drifting down over the whole screen. White with a faint blue edge so they show in light mode too.
+  snow() {
+    const W = this.host.offsetWidth || 1920, H = this.host.offsetHeight || 1080;
+    const cv = this.cv = h('canvas', { class: 'fx' }); cv.width = W; cv.height = H; this.host.append(cv);
+    const ctx = cv.getContext('2d'), rnd = (a, b) => a + Math.random() * (b - a);
+    const flake = top => ({ x: rnd(0, W), y: top ? rnd(-H, 0) : rnd(0, H), r: rnd(3, 8), vy: rnd(.6, 1.4), sw: rnd(0, 6.28), ss: rnd(.006, .016), a: rnd(.55, .95) });
+    const flakes = Array.from({ length: Math.round(W * H / 52000) }, () => flake(false));
+    let last = 0;
+    const step = t => {
+      this.raf = requestAnimationFrame(step);
+      if (t - last < 33) return; last = t; // about 30 frames a second is plenty and easy on the TV
+      ctx.clearRect(0, 0, W, H); ctx.strokeStyle = 'rgba(70,110,160,.5)'; ctx.lineWidth = 1.5; ctx.fillStyle = '#EEF4FB';
+      for (const f of flakes) {
+        f.sw += f.ss; f.y += f.vy * 2; f.x += Math.sin(f.sw) * .9;
+        if (f.y - f.r > H) Object.assign(f, flake(true), { y: -10 });
+        ctx.globalAlpha = f.a; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    };
+    this.raf = requestAnimationFrame(step);
+  }
   fireworks() {
     const W = this.host.offsetWidth || 1920, H = this.host.offsetHeight || 1080;
     const cv = this.cv = h('canvas', { class: 'fx' }); cv.width = W; cv.height = H; this.host.append(cv);
