@@ -372,6 +372,41 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .ycard .screens a { justify-content: center; padding-inline: 4px; min-width: 0; }
 @media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; }
   .editor.side-right .preview { align-items: flex-end; } /* the right screen's preview sits on the right, like the TV */ }
+/* awareness day posters (right-hand screens) */
+.slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
+.aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
+.aw-art { width: 470px; max-width: 100%; }
+.aw-art svg { width: 100%; height: auto; display: block; overflow: visible; }
+.aw-eyebrow { font-size: 30px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--a4); }
+.aw-title { font-family: var(--display); font-weight: 700; font-size: 104px; line-height: 1; letter-spacing: -.02em; margin: 18px 0 26px; }
+.aw-line { font-size: 44px; line-height: 1.3; max-width: 22ch; margin: 0 auto; }
+.aw-tag { margin-top: 30px; font-size: 32px; font-weight: 700; color: var(--a4); }
+.slide.aware.on .aw-text > * { animation: awUp .9s cubic-bezier(.2,.8,.2,1) both; }
+.slide.aware.on .aw-text > :nth-child(2) { animation-delay: .15s; } .slide.aware.on .aw-text > :nth-child(3) { animation-delay: .3s; } .slide.aware.on .aw-text > :nth-child(4) { animation-delay: .45s; }
+.slide.aware.on .aw-art { animation: awPop 1s cubic-bezier(.2,.8,.2,1) both; }
+.slide.aware.calm.on .aw-text > *, .slide.aware.calm.on .aw-art { animation: awFade 2.6s ease both; }
+.slide.aware.calm.on .aw-text > :nth-child(n+2) { animation-delay: .8s; }
+.aw-art svg * { transform-box: view-box; transform-origin: 200px 200px; }
+.aw-pulse { animation: awPulse 4s ease-in-out infinite; } .aw-pulse.d2 { animation-delay: -2s; }
+.aw-float { animation: awFloat 5s ease-in-out infinite; } .aw-float.d2 { animation-delay: -2.5s; }
+.aw-spin { animation: awSpin 30s linear infinite; } .aw-spin.rev { animation-direction: reverse; animation-duration: 18s; } .aw-spin.slow { animation-duration: 60s; }
+.aw-bob { animation: awFloat 6s ease-in-out infinite; }
+.aw-twinkle { animation: awTwinkle 2.4s ease-in-out infinite; } .aw-twinkle.d2 { animation-delay: -.8s; } .aw-twinkle.d3 { animation-delay: -1.6s; }
+.aw-page { animation: awFlip 6s ease-in-out infinite; }
+.aw-land { animation: awLand 24s linear infinite; }
+.aw-poppy { animation: awBreathe 8s ease-in-out infinite; }
+.aw-art svg .aw-twinkle { transform-box: fill-box; transform-origin: center; }
+@keyframes awUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+@keyframes awPop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes awFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes awPulse { 0%, 100% { transform: scale(.92); } 50% { transform: scale(1.04); } }
+@keyframes awFloat { 0%, 100% { transform: translateY(-8px); } 50% { transform: translateY(8px); } }
+@keyframes awSpin { to { transform: rotate(360deg); } }
+@keyframes awTwinkle { 0%, 100% { opacity: .35; transform: scale(.75); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes awFlip { 0%, 30% { transform: scaleX(1); } 50%, 80% { transform: scaleX(-1); } 100% { transform: scaleX(1); } }
+@keyframes awLand { from { transform: translateX(0); } to { transform: translateX(-400px); } }
+@keyframes awBreathe { 0%, 100% { transform: scale(.98); } 50% { transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { .slide.aware *, .slide.aware.on * { animation: none !important; } }
 @media (prefers-reduced-motion: reduce) { .tick-track { animation: none; padding-left: 30px; } .slide { transition: none; } }
 </style>
 <style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}[hidden]{display:none!important}</style>
@@ -1058,6 +1093,67 @@ function weekInfo(d) {
 }
 // "Teaching week 5", or the kind of week, e.g. "Assessment week".
 const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.teaching : '');
+
+// ---------- awareness days ----------
+// A poster for each awareness day, shown first on every year's right-hand screen on the day. When the day isn't
+// a school day (World Mental Health Day 2026 is a Saturday) it shows on the school day before instead.
+const awStar = (x, y, r, c) => `<path d="M${x} ${y - r}l${r * .28} ${r * .72} ${r * .72} ${r * .28}-${r * .72} ${r * .28}-${r * .28} ${r * .72}-${r * .28}-${r * .72}-${r * .72}-${r * .28} ${r * .72}-${r * .28}z" fill="${c}"/>`;
+const awLand = '<ellipse cx="110" cy="150" rx="62" ry="36"/><ellipse cx="170" cy="235" rx="40" ry="62"/><ellipse cx="300" cy="165" rx="56" ry="40"/><ellipse cx="335" cy="262" rx="42" ry="30"/><ellipse cx="55" cy="275" rx="34" ry="46"/><ellipse cx="240" cy="95" rx="30" ry="18"/>';
+const AWARENESS_DAYS = [
+  { key: 'wmhd', date: '2026-10-10', title: 'World Mental Health Day', line: 'It\'s OK not to be OK. Talk to someone you trust.',
+    tag: 'Your tutor and your year team are always here to listen.', colors: ['#0E6B5C', '#2BB38F', '#073B33', '#9BE3C8'],
+    art: `<svg viewBox="0 0 400 400"><circle class="aw-pulse" cx="200" cy="200" r="170" fill="#fff" opacity=".07"/><circle class="aw-pulse d2" cx="200" cy="200" r="120" fill="#fff" opacity=".08"/>
+      <g class="aw-float"><path d="M60 60h180a26 26 0 0 1 26 26v56a26 26 0 0 1-26 26H124l-34 30v-30H60a26 26 0 0 1-26-26V86a26 26 0 0 1 26-26z" fill="#fff"/><text x="150" y="127" text-anchor="middle" font-size="38" font-weight="700" fill="#0E6B5C" font-family="Arial,sans-serif">You OK?</text></g>
+      <g class="aw-float d2"><path d="M160 214h180a26 26 0 0 1 26 26v56a26 26 0 0 1-26 26h-30v30l-34-30H160a26 26 0 0 1-26-26v-56a26 26 0 0 1 26-26z" fill="#9BE3C8"/><text x="250" y="281" text-anchor="middle" font-size="38" font-weight="700" fill="#073B33" font-family="Arial,sans-serif">I'm here</text></g></svg>` },
+  { key: 'armistice', date: '2026-11-11', title: 'Armistice Day', calm: true, line: 'At 11am we fall silent for two minutes to remember all those who gave their lives.',
+    tag: 'We will remember them.', colors: ['#1E1719', '#5E0D1B', '#0D0A0B', '#E8A0A8'],
+    art: `<svg viewBox="0 0 400 400"><g class="aw-poppy"><path d="M205 250C215 300 228 340 250 392" stroke="#3E7B3A" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M234 342c30-22 62-24 84-14-22 22-54 30-84 14z" fill="#3E7B3A"/>
+      <g fill="#D0142C"><circle cx="200" cy="116" r="88"/><circle cx="116" cy="196" r="86"/><circle cx="284" cy="196" r="86"/><circle cx="200" cy="264" r="80"/></g>
+      <g fill="#9E0C20" opacity=".5"><circle cx="160" cy="158" r="42"/><circle cx="240" cy="158" r="42"/><circle cx="160" cy="234" r="42"/><circle cx="240" cy="234" r="42"/></g>
+      <circle cx="200" cy="196" r="40" fill="#141414"/><g fill="#444"><circle cx="187" cy="185" r="5"/><circle cx="213" cy="185" r="5"/><circle cx="200" cy="209" r="5"/><circle cx="185" cy="205" r="4"/><circle cx="215" cy="205" r="4"/></g></g></svg>` },
+  { key: 'sid', date: '2027-02-09', title: 'Safer Internet Day', line: 'Think before you share. If anything online worries you, tell an adult you trust.',
+    tag: 'Keep your personal information private.', colors: ['#1F4BB8', '#4C8DF6', '#10286B', '#BFD8FF'],
+    art: `<svg viewBox="0 0 400 400"><circle class="aw-spin" cx="200" cy="200" r="175" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="5" stroke-dasharray="3 20" stroke-linecap="round"/>
+      <g class="aw-spin rev"><circle cx="200" cy="25" r="13" fill="#7FD3FF"/><circle cx="375" cy="200" r="10" fill="#FFD166"/><circle cx="60" cy="303" r="11" fill="#fff"/></g>
+      <g class="aw-bob"><path d="M200 66l112 40v84c0 72-48 120-112 144-64-24-112-72-112-144v-84z" fill="#fff"/><path d="M200 90l90 32v68c0 58-38 100-90 120z" fill="#DCEBFF"/>
+      <rect x="158" y="186" width="84" height="68" rx="12" fill="#1F4BB8"/><path d="M174 186v-22a26 26 0 0 1 52 0v22" fill="none" stroke="#1F4BB8" stroke-width="12"/><circle cx="200" cy="212" r="10" fill="#fff"/><rect x="195" y="214" width="10" height="22" rx="4" fill="#fff"/></g></svg>` },
+  { key: 'wbd', date: '2027-03-04', title: 'World Book Day', line: 'What are you reading? Share a favourite book with your tutor group.',
+    tag: 'Every book is a new adventure.', colors: ['#C2571A', '#F2A33A', '#7A2E0B', '#FFE08A'],
+    art: `<svg viewBox="0 0 400 400"><g class="aw-twinkle">${awStar(70, 70, 26, '#FFE08A')}</g><g class="aw-twinkle d2">${awStar(335, 60, 20, '#fff')}</g><g class="aw-twinkle d3">${awStar(345, 345, 24, '#FFE08A')}</g>
+      <g class="aw-bob"><path d="M200 130C160 105 100 100 46 110v196c54-10 114-5 154 20z" fill="#fff"/><g stroke="#E8BE7A" stroke-width="6" stroke-linecap="round"><path d="M76 150h96M76 182h96M76 214h86M76 246h96M76 278h70"/></g>
+      <path d="M200 130c40-25 100-30 154-20v196c-54-10-114-5-154 20z" fill="#FFF4DD"/><g stroke="#E8BE7A" stroke-width="6" stroke-linecap="round"><path d="M228 150h96M228 182h96M228 214h86M228 246h96"/></g>
+      <path class="aw-page" d="M200 130c40-25 100-30 154-20v196c-54-10-114-5-154 20z" fill="#FFE2A6"/><path d="M200 128v198" stroke="#B9782A" stroke-width="5"/></g></svg>` },
+  { key: 'iwd', date: '2027-03-08', title: 'International Women\'s Day', line: 'Celebrating the achievements of women and girls everywhere.',
+    tag: 'Who inspires you?', colors: ['#5B2A86', '#9B5DE5', '#2E1250', '#C9F2C7'],
+    art: `<svg viewBox="0 0 400 400"><g class="aw-spin slow">${Array.from({ length: 16 }, (_, i) => `<path d="M200 200L${(200 + 190 * Math.cos((i + .5) * Math.PI / 8)).toFixed(1)} ${(200 + 190 * Math.sin((i + .5) * Math.PI / 8)).toFixed(1)}A190 190 0 0 1 ${(200 + 190 * Math.cos((i + 1) * Math.PI / 8)).toFixed(1)} ${(200 + 190 * Math.sin((i + 1) * Math.PI / 8)).toFixed(1)}z" fill="${['#fff', '#C9F2C7', '#E3C8FF'][i % 3]}" opacity=".22"/>`).join('')}</g>
+      <circle cx="200" cy="200" r="108" fill="#fff"/><circle cx="200" cy="200" r="92" fill="#5B2A86"/><text x="200" y="208" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="88" fill="#fff">8</text><text x="200" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="28" letter-spacing="5" fill="#C9F2C7">MARCH</text>
+      <g class="aw-twinkle">${awStar(68, 82, 24, '#fff')}</g><g class="aw-twinkle d2">${awStar(340, 110, 18, '#C9F2C7')}</g><g class="aw-twinkle d3">${awStar(320, 335, 26, '#fff')}</g></svg>` },
+  { key: 'earth', date: '2027-04-22', title: 'Earth Day', line: 'Small changes, big difference. Switch it off, reuse it, recycle it.',
+    tag: 'There is no planet B.', colors: ['#1E7B4A', '#36B37E', '#0B3D2A', '#B8F0C8'],
+    art: `<svg viewBox="0 0 400 400"><defs><clipPath id="awGlobe"><circle cx="200" cy="200" r="142"/></clipPath></defs>
+      <circle class="aw-spin" cx="200" cy="200" r="175" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="5" stroke-dasharray="3 20" stroke-linecap="round"/>
+      <circle cx="200" cy="200" r="142" fill="#2E86DE"/><g clip-path="url(#awGlobe)"><g class="aw-land" fill="#5CCB6F">${awLand}<g transform="translate(400 0)">${awLand}</g></g>
+      <path d="M200 58a142 142 0 0 1 0 284a110 142 0 0 0 0-284z" fill="#000" opacity=".16"/></g>
+      <circle cx="200" cy="200" r="142" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="4"/></svg>` },
+];
+// The school day a poster shows on: the day itself, or the school day before when it falls on a weekend or holiday.
+function awarenessShowDay(iso) {
+  const d = new Date(iso + 'T12:00:00'); if (isSchoolDay(d)) return iso;
+  for (let k = 1; k <= 3; k++) { const p = new Date(d); p.setDate(d.getDate() - k); if (isSchoolDay(p)) return isoDay(p); }
+  return iso;
+}
+const todaysAwareness = (now = new Date()) => { const t = todayISO(now); return AWARENESS_DAYS.find(a => a.date === t || awarenessShowDay(a.date) === t) || null; };
+function awarenessEl(key) {
+  const a = AWARENESS_DAYS.find(x => x.key === key);
+  const days = Math.round((new Date(a.date + 'T12:00:00') - new Date(todayISO() + 'T12:00:00')) / 864e5);
+  const when = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : 'Coming up';
+  const art = h('div', { class: 'aw-art' }); art.innerHTML = a.art; // fixed artwork from this file, never user text
+  const [c1, c2, c3, c4] = a.colors;
+  return h('div', { class: 'slide aware aw-' + a.key + (a.calm ? ' calm' : ''), style: `--a1:${c1};--a2:${c2};--a3:${c3};--a4:${c4}` },
+    h('div', { class: 'aw' }, art, h('div', { class: 'aw-text' },
+      h('div', { class: 'aw-eyebrow', text: when + ' · ' + fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long' }) }),
+      h('div', { class: 'aw-title', text: a.title }), h('div', { class: 'aw-line', text: a.line }), h('div', { class: 'aw-tag', text: a.tag }))));
+}
 // Students of the week are chosen on Fridays for the week after, so from Friday it moves on to the next school week.
 function sotwWeek(d = new Date()) {
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -1307,7 +1403,9 @@ class PortraitStage {
   }
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
   buildSlides() {
-    const list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
+    let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
+    const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
+    if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
     const key = JSON.stringify([list, usesCentre ? [this.centre.housePoints, this.centre.sotw] : 0, todayISO(), store.mascots]);
     if (key === this.slideKey) return;
@@ -1320,6 +1418,7 @@ class PortraitStage {
     this.show();
   }
   slideEl(s, i) {
+    if (s.type === 'awareness') return awarenessEl(s.key);
     const c = HC[(i * 3 + 1) % 8];
     const wrap = (cls, ...kids) => h('div', { class: 'slide ' + cls, style: '--c:' + c }, ...kids);
     const pad = (...kids) => h('div', { class: 'pp' }, ...kids);
