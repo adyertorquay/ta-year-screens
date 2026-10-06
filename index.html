@@ -372,6 +372,7 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .ycard .screens a { justify-content: center; padding-inline: 4px; min-width: 0; }
 @media (max-width: 960px) { .editor.side-ed { grid-template-columns: minmax(0, 1fr); } .frame.portrait { max-width: 260px; }
   .editor.side-right .preview { align-items: flex-end; } /* the right screen's preview sits on the right, like the TV */ }
+.fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
 .aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
@@ -1094,6 +1095,54 @@ function weekInfo(d) {
 // "Teaching week 5", or the kind of week, e.g. "Assessment week".
 const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.teaching : '');
 
+// ---------- seasonal effects ----------
+// Light effects drawn over every screen on certain days. Fireworks Night: one small firework every few seconds,
+// in the top part of the screen, gone in under two seconds. Turned off when the device asks for reduced motion.
+const EFFECTS = [{ key: 'fireworks', from: '2026-11-05', to: '2026-11-05' }];
+const todaysEffect = (now = new Date()) => { const t = todayISO(now); return EFFECTS.find(e => t >= e.from && t <= e.to) || null; };
+class Effects {
+  constructor(host) { this.host = host; this.cur = null; this.parts = []; this.check(); this.timer = setInterval(() => this.check(), 60000); }
+  check() {
+    const e = matchMedia('(prefers-reduced-motion: reduce)').matches ? null : todaysEffect();
+    const k = e ? e.key : null; if (k === this.cur) return;
+    this.off(); this.cur = k;
+    if (k === 'fireworks') this.fireworks();
+  }
+  off() { clearTimeout(this.next); cancelAnimationFrame(this.raf); this.raf = 0; if (this.cv) this.cv.remove(); this.cv = null; this.parts = []; }
+  stop() { clearInterval(this.timer); this.off(); }
+  fireworks() {
+    const W = this.host.offsetWidth || 1920, H = this.host.offsetHeight || 1080;
+    const cv = this.cv = h('canvas', { class: 'fx' }); cv.width = W; cv.height = H; this.host.append(cv);
+    const ctx = cv.getContext('2d'), cols = ['#E63946', '#F4A300', '#2A9D8F', '#3954A5', '#D23A6C', '#6F439A', '#F78F1E'];
+    const rockets = [], rnd = (a, b) => a + Math.random() * (b - a);
+    const step = () => {
+      ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round';
+      for (const r of rockets) {
+        r.y -= 14; ctx.globalAlpha = .8; ctx.strokeStyle = r.c; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(r.x, r.y + 40); ctx.lineTo(r.x, r.y); ctx.stroke();
+        if (r.y <= r.ty) { r.done = true; const n = 50 + Math.floor(rnd(0, 20)), sp = rnd(5, 7.5);
+          for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rnd(-.05, .05), v = sp * rnd(.55, 1);
+            this.parts.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: Math.random() < .2 ? '#F4A300' : r.c }); } }
+      }
+      for (let i = rockets.length - 1; i >= 0; i--) if (rockets[i].done) rockets.splice(i, 1);
+      this.parts = this.parts.filter(p => p.life > 0); ctx.lineWidth = 3.5;
+      for (const p of this.parts) {
+        p.vx *= .975; p.vy = p.vy * .975 + .06; p.x += p.vx; p.y += p.vy; p.life -= .012;
+        ctx.globalAlpha = Math.max(0, p.life) * .9; ctx.strokeStyle = p.c;
+        ctx.beginPath(); ctx.moveTo(p.x - p.vx * 3, p.y - p.vy * 3); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      this.raf = rockets.length || this.parts.length ? requestAnimationFrame(step) : (ctx.clearRect(0, 0, W, H), 0); // idle between fireworks
+    };
+    const launch = () => {
+      const x = W * rnd(.12, .88), ty = H * rnd(.12, .38);
+      rockets.push({ x, y: ty + H * .22, ty, c: cols[Math.floor(Math.random() * cols.length)] });
+      if (!this.raf) this.raf = requestAnimationFrame(step);
+      this.next = setTimeout(launch, rnd(3500, 7000));
+    };
+    this.next = setTimeout(launch, 1500);
+  }
+}
+
 // ---------- awareness days ----------
 // A poster for each awareness day, shown first on every year's right-hand screen on the day. When the day isn't
 // a school day (World Mental Health Day 2026 is a Saturday) it shows on the school day before instead.
@@ -1228,6 +1277,7 @@ class Stage {
     this.fit.append(this.el); host.append(this.fit);
     this.ro = new ResizeObserver(() => this.scale()); this.ro.observe(this.fit); this.scale();
     this.timer = setInterval(() => this.tick(), 1000);
+    this.fx = new Effects(this.el);
     this.tick();
   }
   scale() {
@@ -1235,7 +1285,7 @@ class Stage {
     const s = Math.min(w / 1920, ht / 1080);
     this.el.style.transform = `translate(${(w - 1920 * s) / 2}px, ${(ht - 1080 * s) / 2}px) scale(${s})`;
   }
-  destroy() { clearInterval(this.timer); this.ro.disconnect(); this.fit.remove(); }
+  destroy() { clearInterval(this.timer); this.fx.stop(); this.ro.disconnect(); this.fit.remove(); }
   setData(scr, les) {
     this.scr = normal(scr); this.les = les || null;
     this.buildSlides(); this.renderSide(); this.renderTicker();
@@ -1389,6 +1439,7 @@ class PortraitStage {
     this.fit.append(this.el); host.append(this.fit);
     this.ro = new ResizeObserver(() => this.scale()); this.ro.observe(this.fit); this.scale();
     this.timer = setInterval(() => this.tick(), 1000);
+    this.fx = new Effects(this.el);
     this.tick();
   }
   scale() {
@@ -1396,7 +1447,7 @@ class PortraitStage {
     const s = Math.min(w / 1080, ht / 1920);
     this.el.style.transform = `translate(${(w - 1080 * s) / 2}px, ${(ht - 1920 * s) / 2}px) scale(${s})`;
   }
-  destroy() { clearInterval(this.timer); this.ro.disconnect(); this.fit.remove(); }
+  destroy() { clearInterval(this.timer); this.fx.stop(); this.ro.disconnect(); this.fit.remove(); }
   setData(sideDoc, centreDoc, les) {
     this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => hwSlide(this.year, x)) }); this.centre = normal(centreDoc); this.les = les || null;
     this.buildSlides(); this.renderNext(true);
