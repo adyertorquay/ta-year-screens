@@ -385,6 +385,13 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .takeover.remembrance .to-text { animation: none; }
 .takeover.remembrance .to-sub { color: #E8A0A8; font-size: 3.4vmin; letter-spacing: .12em; }
 .to-poppy { width: 30vmin; }
+.datebar { display: flex; flex-direction: column; gap: 6px; }
+.datebar-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.datebar select, .datebar input { font: inherit; font-size: .95rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color-scheme: inherit; }
+.datebar select { max-width: 100%; } .datebar input { width: auto; flex: 0 1 auto; }
+.frame { container-type: size; }
+.frame .takeover { position: absolute; z-index: 30; gap: 4cqmin; padding: 6cqmin; }
+.frame .takeover .ta-logo { height: 18cqmin; } .frame .takeover .to-text { font-size: 13cqmin; } .frame .takeover .to-sub, .frame .takeover.remembrance .to-sub { font-size: 3.4cqmin; } .frame .to-poppy { width: 30cqmin; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
 .aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
@@ -1190,6 +1197,43 @@ class Effects {
   }
 }
 
+// ---------- preview on a date (editors) ----------
+// Under each editor's preview: pick a date (and time) to see that day's posters, effects and full-screen messages.
+function datePreviewBar(stage, frame, side, openLink, key) {
+  const EFFECT_NAMES = { fireworks: 'Fireworks Night', snow: 'Snow (last week before Christmas)', remembrance: 'Armistice Day (grey screens and poppy)' };
+  const special = [
+    ...EFFECTS.map(e => ({ label: EFFECT_NAMES[e.key] || e.key, date: e.from })),
+    ...TAKEOVERS.filter(t => t.date).map(t => ({ label: t.text.replace('’', "'") + ' (' + t.at + ')', date: t.date, time: t.at })),
+    ...(side === 'right' ? AWARENESS_DAYS.map(a => ({ label: a.title + ' poster', date: awarenessShowDay(a.date) })) : []),
+  ].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+  const pick = h('select', { 'aria-label': 'Special days' }, h('option', { value: '', text: 'Special days…' }),
+    special.map((s, i) => h('option', { value: i, text: fmtDate(s.date, { day: 'numeric', month: 'short' }) + ' · ' + s.label })));
+  const date = h('input', { type: 'date', 'aria-label': 'Preview date' }), time = h('input', { type: 'time', 'aria-label': 'Preview time (optional)' });
+  const reset = h('button', { class: 'btn small ghost', type: 'button', text: 'Back to today' });
+  // A copy of the full-screen message, sized to the preview.
+  const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
+  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-text' }), h('div', { class: 'to-sub' }));
+  frame.append(to);
+  const apply = () => {
+    previewDate = date.value || null;
+    const tm = /^(\d{1,2}):(\d{2})/.exec(time.value); previewTime = previewDate && tm ? +tm[1] * 60 + +tm[2] : null;
+    stage.fx.off(); stage.fx.cur = null; stage.fx.check();
+    stage.slideKey = null; stage.buildSlides(); stage.tick();
+    const t = previewDate ? activeTakeover() : null;
+    to.hidden = !t;
+    if (t) { $('.to-text', to).textContent = t.text; $('.to-sub', to).textContent = t.sub || VALUES_LINE; to.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
+      poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', to).hidden = t.kind === 'remembrance'; }
+    reset.hidden = !previewDate;
+    openLink.href = '#' + key + (previewDate ? '@' + previewDate + (previewTime != null ? 'T' + time.value.slice(0, 5) : '') : '');
+  };
+  pick.addEventListener('change', () => { const s = special[+pick.value]; if (!s) return; date.value = s.date; time.value = s.time || ''; apply(); });
+  date.addEventListener('change', () => { pick.value = ''; apply(); });
+  time.addEventListener('change', () => { pick.value = ''; apply(); });
+  reset.addEventListener('click', () => { pick.value = ''; date.value = ''; time.value = ''; apply(); });
+  reset.hidden = true;
+  return h('div', { class: 'datebar' }, h('span', { class: 'eyebrow', text: 'Preview on a date' }), h('div', { class: 'datebar-row' }, pick, date, time, reset));
+}
+
 // ---------- awareness days ----------
 // A poster for each awareness day, shown first on every year's right-hand screen on the day. When the day isn't
 // a school day (World Mental Health Day 2026 is a Saturday) it shows on the school day before instead.
@@ -1421,8 +1465,8 @@ class Stage {
   }
   tick() {
     const now = new Date();
-    $('.time', this.el).textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    $('.date', this.el).textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('.time', this.el).textContent = previewDate && previewTime != null ? String(Math.floor(previewTime / 60)).padStart(2, '0') + ':' + String(previewTime % 60).padStart(2, '0') : now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    $('.date', this.el).textContent = previewDate ? fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long' }) : now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
     if (now.getSeconds() === 0 || !this.nextKey) this.renderNext();
     const secs = Math.max(5, +this.scr.slideSeconds || 12);
     if (this.slides.length > 1 && Date.now() - this.lastAdvance >= secs * 1000) {
@@ -1605,8 +1649,8 @@ class PortraitStage {
   }
   tick() {
     const now = new Date();
-    $('.time', this.el).textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    $('.date', this.el).textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('.time', this.el).textContent = previewDate && previewTime != null ? String(Math.floor(previewTime / 60)).padStart(2, '0') + ':' + String(previewTime % 60).padStart(2, '0') : now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    $('.date', this.el).textContent = previewDate ? fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long' }) : now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
     if (now.getSeconds() === 0 || !this.nextKey) { this.renderNext(); this.buildSlides(); }
     const secs = Math.max(5, +this.data.slideSeconds || 12);
     if (!this.pinned && this.slides.length > 1 && Date.now() - this.lastAdvance >= secs * 1000) {
@@ -1743,15 +1787,17 @@ function viewEdit(y) {
   const banner = h('div', { class: 'banner', hidden: true }, h('span', { text: 'Someone else has saved changes to this screen.' }),
     h('button', { class: 'btn small', type: 'button', onclick: () => { loadRemote(); }, text: 'Load their version' }));
   const frame = h('div', { class: 'frame' });
+  const openLink = h('a', { class: 'btn', href: '#' + y, text: 'Open screen' }), dateSlot = h('div');
   const form = h('div', {});
 
   app.append(h('div', { class: 'wrap' },
     editorTop(y, 'centre'),
     h('div', { class: 'editor' }, form,
       h('div', { class: 'preview' }, h('div', { class: 'eyebrow', text: 'Live preview' }), frame,
-        h('div', { class: 'savebar' }, saveBtn, h('a', { class: 'btn', href: '#' + y, text: 'Open screen' }), status), banner))));
+        h('div', { class: 'savebar' }, saveBtn, openLink, status), dateSlot, banner))));
 
   const stage = new Stage(frame, y);
+  dateSlot.replaceWith(datePreviewBar(stage, frame, null, openLink, y));
   let pT; const preview = () => { clearTimeout(pT); pT = setTimeout(() => stage.setData(draft, store.lessons[y]), 150); };
   const touch = () => { dirty = true; setStatus('Unsaved changes'); preview(); };
   function setStatus(t, cls = '') { status.textContent = t; status.className = 'status ' + cls; }
@@ -1937,13 +1983,15 @@ function viewEditSide(y, side) {
   const banner = h('div', { class: 'banner', hidden: true }, h('span', { text: 'Someone else has saved changes to this screen.' }),
     h('button', { class: 'btn small', type: 'button', onclick: () => loadRemote(), text: 'Load their version' }));
   const frame = h('div', { class: 'frame portrait' });
+  const openLink = h('a', { class: 'btn', href: '#' + key, text: 'Open screen' }), dateSlot = h('div');
   const form = h('div', {});
   app.append(h('div', { class: 'wrap' }, editorTop(y, side),
     h('div', { class: 'editor side-ed side-' + side }, form,
       h('div', { class: 'preview' }, h('div', { class: 'eyebrow', text: 'Live preview' }), frame,
-        h('div', { class: 'savebar' }, saveBtn, h('a', { class: 'btn', href: '#' + key, text: 'Open screen' }), playBtn), status, banner))));
+        h('div', { class: 'savebar' }, saveBtn, openLink, playBtn), status, dateSlot, banner))));
 
   const stage = new PortraitStage(frame, y, side);
+  dateSlot.replaceWith(datePreviewBar(stage, frame, side, openLink, key));
   const refresh = () => stage.setData(draft, store.screens[y], store.lessons[y]);
   let pT; const preview = () => { clearTimeout(pT); pT = setTimeout(refresh, 150); };
   function setStatus(t, cls = '') { status.textContent = t; status.className = 'status ' + cls; }
