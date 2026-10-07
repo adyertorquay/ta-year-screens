@@ -261,22 +261,23 @@ begin
   end if;
   if jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 5000 then raise exception 'bad rows'; end if;
 
+  -- One pupil per row ("Amy Test"), so names are compared whole (exact, ignoring case and extra spaces).
   create temp table _ll on commit drop as
   with r as (
-    select row_number() over () as id, lower(x ->> 'students') as raw, (x ->> 'date')::date as d
+    select row_number() over () as id, regexp_replace(lower(trim(x ->> 'students')), '\s+', ' ', 'g') as raw, (x ->> 'date')::date as d
       from jsonb_array_elements(p_rows) x
      where (x ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (x ->> 'date')::date in (today, prev)
   ),
-  pupils as ( -- every way Arbor might write the name, escaped for a whole-word match
-    select s.upn, s.year_group::text as y, coalesce(s.form, '') as form, trim(s.forename) as forename, trim(s.surname) as surname, n
+  pupils as ( -- every way Arbor might write the name
+    select s.upn, s.year_group::text as y, coalesce(s.form, '') as form, trim(s.forename) as forename, trim(s.surname) as surname,
+           regexp_replace(lower(v.n), '\s+', ' ', 'g') as n
       from public.students s,
            lateral (values (trim(s.forename) || ' ' || trim(s.surname)), (split_part(trim(s.forename), ' ', 1) || ' ' || trim(s.surname)),
                            (trim(s.surname) || ', ' || trim(s.forename)), (trim(s.surname) || ', ' || split_part(trim(s.forename), ' ', 1))) v(n)
      where s.year_group::text in ('7', '8', '9', '10', '11') and coalesce(s.forename, '') <> '' and coalesce(s.surname, '') <> ''
   )
   select distinct r.id, r.d, p.upn, p.y, p.form, p.forename, p.surname
-    from r join pupils p
-      on r.raw ~ ('(^|[^a-z])' || regexp_replace(lower(p.n), '([.^$*+?()\[\]{}|\\-])', '\\\1', 'g') || '($|[^a-z])');
+    from r join pupils p on p.n = r.raw;
 
   select count(*) into n_rows from jsonb_array_elements(p_rows) x where (x ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (x ->> 'date')::date in (today, prev);
   select count(distinct id) into n_hits from _ll;

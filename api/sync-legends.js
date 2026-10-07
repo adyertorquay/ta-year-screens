@@ -40,11 +40,16 @@ module.exports = async (req, res) => {
     const feed = await fetch(env.ARBOR_LEGENDS_FEED_URL, { headers: { accept: 'application/json, text/csv, */*' } });
     if (!feed.ok) throw new Error('Arbor feed answered ' + feed.status);
     const r = legends(await feed.text(), feed.headers.get('content-type') || '', { behaviour: env.LEGENDS_BEHAVIOUR });
-    const saved = await rpc('save_legends', { p_secret: secret, p_rows: r.awards });
+    // Only today's and the previous school day's awards are needed.
+    const uk = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(d);
+    const now = new Date(), dow = new Date(uk(now) + 'T12:00:00Z').getUTCDay();
+    const keep = [uk(now), uk(new Date(now - 864e5 * (dow === 1 ? 3 : dow === 0 ? 2 : 1)))];
+    const awards = r.awards.filter(a => keep.includes(a.date));
+    const saved = await rpc('save_legends', { p_secret: secret, p_rows: awards });
     if (saved.status === 401 || saved.status === 403) throw new Error('The database did not accept LEGENDS_SECRET (' + secret.length + ' characters; it should be 64). It should match: select secret from screens.feed_keys where name = \'legends\'; then redeploy.');
     if (!saved.ok) throw new Error('Supabase answered ' + saved.status + ': ' + (await saved.text()).slice(0, 200));
     // Counts and column names only, never names.
-    res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, columns: r.cols, saved: await saved.json() });
+    res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, todayAndPrevious: awards.length, columns: r.cols, saved: await saved.json() });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
