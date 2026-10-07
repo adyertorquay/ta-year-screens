@@ -560,6 +560,8 @@ function birthdaysOn(people, d) {
 }
 // A long names list becomes several pages that take turns, so the names stay large (Adam, 7 Oct 2026).
 const LIST_PAGE = 12;
+// Learning Legends slides (each page) move on faster than the screen's usual "Seconds per slide" (Adam, 7 Oct 2026).
+const LEGENDS_SECONDS = 7;
 function pagedList(s) {
   if (s.type !== 'list') return [s];
   const all = lines(s.items); if (all.length <= LIST_PAGE) return [s];
@@ -1632,7 +1634,7 @@ class PortraitStage {
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
   buildSlides() {
     let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
-    list = list.flatMap(pagedList);
+    list = list.flatMap(pagedList).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
@@ -1741,7 +1743,7 @@ class PortraitStage {
     $('.time', this.el).textContent = previewDate && previewTime != null ? String(Math.floor(previewTime / 60)).padStart(2, '0') + ':' + String(previewTime % 60).padStart(2, '0') : now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     $('.date', this.el).textContent = previewDate ? fmtDate(previewDate, { weekday: 'long', day: 'numeric', month: 'long' }) : now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
     if (now.getSeconds() === 0 || !this.nextKey) { this.renderNext(); this.buildSlides(); }
-    const secs = Math.max(5, +this.data.slideSeconds || 12);
+    const cur = this.slides[this.idx], secs = cur && cur.seconds ? cur.seconds : Math.max(5, +this.data.slideSeconds || 12);
     if (!this.pinned && this.slides.length > 1 && Date.now() - this.lastAdvance >= secs * 1000) {
       this.idx = (this.idx + 1) % this.slides.length; this.lastAdvance = Date.now(); this.show();
     }
