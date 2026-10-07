@@ -1001,7 +1001,6 @@ function viewLogin(a, want) {
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
       h('div', { class: 'years-go' }, a.years.map(editLink), TUTOR_SLIDES ? null : h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
-      a.admin && window.SCREENS_BACKEND && window.SCREENS_BACKEND.mode === 'live' ? h('p', { class: 'hint' }, h('a', { href: '#import', text: 'Copy the demo content into the live screens' })) : null,
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1009,7 +1008,7 @@ function viewLogin(a, want) {
   if (!a) { const tok = routeTok; getAccess().then(x => { if (tok === routeTok) draw(x); }); }
 }
 
-// One-off move from demo mode to the live database (admins only): everything this browser had in demo mode
+// One-off move from demo mode to the live database (admins only, open #import by hand; no link since the move is done): everything this browser had in demo mode
 // (the built-in sample plus any edits saved here, photos included) is copied into the live screens.
 const DEMO_KEY = 'ta_screens_demo_docs';
 function viewImport() {
