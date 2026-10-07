@@ -558,6 +558,15 @@ function birthdaysOn(people, d) {
   const key = dayKey(d);
   return lines(people).map(splitPerson).filter(p => { const m = /^(\d{1,2})[\/.\-](\d{1,2})/.exec(p.extra); return m && m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') === key; });
 }
+// A long names list becomes several pages that take turns, so the names stay large (Adam, 7 Oct 2026).
+const LIST_PAGE = 12;
+function pagedList(s) {
+  if (s.type !== 'list') return [s];
+  const all = lines(s.items); if (all.length <= LIST_PAGE) return [s];
+  const n = Math.ceil(all.length / LIST_PAGE), per = Math.ceil(all.length / n); // even pages, not 12 + 1
+  return Array.from({ length: n }, (_, k) => Object.assign({}, s, { id: s.id + '#' + (k + 1), items: all.slice(k * per, (k + 1) * per).join('\n'),
+    subtitle: [s.subtitle, 'Page ' + (k + 1) + ' of ' + n].filter(Boolean).join(' · ') }));
+}
 function hasContent(s, centre) {
   switch (s.type) {
     case 'list': return !!(s.title && (lines(s.items).length || s.emptyText));
@@ -1623,6 +1632,7 @@ class PortraitStage {
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
   buildSlides() {
     let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
+    list = list.flatMap(pagedList);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
