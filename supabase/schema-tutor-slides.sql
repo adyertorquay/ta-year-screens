@@ -102,8 +102,11 @@ create or replace function screens.hidden_groups() returns text[] language sql i
 
 -- Screen homework names -> Tutor Slides homework.subject, and how the screens band the results.
 create or replace function screens.hw_subject(kind text) returns text language sql immutable as $$
+  -- "-next" is the most recently set week in Tutor Slides; the page decides which of the two is running now.
   select case kind when 'sparx-maths' then 'sparx_maths' when 'sparx-reader' then 'sparx_reader'
-    when 'sparx-science' then 'sparx_science' when 'tassomai' then 'tassomai' end
+    when 'sparx-science' then 'sparx_science' when 'tassomai' then 'tassomai'
+    when 'sparx-maths-next' then 'sparx_maths_next' when 'sparx-reader-next' then 'sparx_reader_next'
+    when 'sparx-science-next' then 'sparx_science_next' end
 $$;
 
 -- One read-only document in the same shape the screens already use:
@@ -170,10 +173,9 @@ begin
          and not exists (select 1 from public.hidden_pupils x where x.upn = h.upn)
          and not exists (select 1 from public.hidden_homework x where x.upn = h.upn and x.subject = h.subject)
     ),
-    -- Percentages may be stored as 0 to 1; the screens work in 0 to 100.
-    scale as (select case when arg <> 'tassomai' and max(value) <= 1 then 100 else 1 end as k from raw),
+    -- Tutor Slides stores Sparx as 0 to 100 (%), Tassomai as points.
     r as (
-      select y, grp, coalesce(value, 0) * (select k from scale) as v, updated_at from raw
+      select y, grp, coalesce(value, 0) as v, updated_at from raw
        where grp is null or not (y || grp = any (screens.hidden_groups()))
     ),
     b as (  -- bands, matching HW_BANDS in index.html

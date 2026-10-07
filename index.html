@@ -592,7 +592,7 @@ const listeners = new Set();
 function subscribe(y) {
   if (!db || subs[y]) return;
   if (!subs._hpall) subs._hpall = db.doc('housepoints/all').onSnapshot(s => { store.hp.all = s.exists ? s.data() : null; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('hp', e));
-  if (!subs._hw) subs._hw = Object.keys(HOMEWORK).map(k => db.doc('homework/' + k).onSnapshot(s => { store.homework[k] = s.exists ? s.data() : null; YEARS.forEach(emit); emit('homework'); }, e => console.warn('homework', e)));
+  if (!subs._hw) subs._hw = Object.keys(HOMEWORK).concat(TUTOR_SLIDES ? HW_NEXT : []).map(k => db.doc('homework/' + k).onSnapshot(s => { store.homework[k] = s.exists ? s.data() : null; YEARS.forEach(emit); emit('homework'); }, e => console.warn('homework', e)));
   if (!subs._celeb) subs._celeb = db.doc('celebrations/all').onSnapshot(s => { store.shared = s.exists ? (s.data().items || []) : []; YEARS.forEach(yy => { withHP(yy); emit(yy); }); }, e => console.warn('celebrations', e));
   if (!subs._config) subs._config = db.doc('config/houses').onSnapshot(s => { store.mascots = s.exists ? (s.data().mascots || null) : null; YEARS.forEach(emit); }, e => console.warn('config', e));
   subs[y] = [
@@ -651,12 +651,25 @@ const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWO
 // "· due Tue 6 Oct" on homework slides (worked out from the column heading for uploads saved before this was stored).
 // Tutor Slides doesn't say which week its numbers are for, so they are taken as the homework running now.
 const TUTOR_SLIDES = !!(window.SCREENS_BACKEND && window.SCREENS_BACKEND.shared);
-const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(d.source === 'tutor-slides' ? hwCurrent(kind) : hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
+const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
+// Tutor Slides keeps two Sparx weeks: "-next" is the newest week's homework (week beginning this Monday), the plain
+// one is last week's. Each subject shows the homework running now: this week's once it has been set (Maths and
+// Science on Wednesday, Reader on Friday), until then last week's, which is still running or has just been due.
+const HW_NEXT = ['sparx-maths-next', 'sparx-reader-next', 'sparx-science-next'];
+function hwDoc(kind, now = new Date()) {
+  const cur = store.homework[kind];
+  if (!TUTOR_SLIDES || !cur || cur.source !== 'tutor-slides' || !HW_SCHEDULE[kind]) return cur;
+  const sc = HW_SCHEDULE[kind], mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
+  if (kind === 'tassomai') { const w = hwCurrent(kind, now); return w ? Object.assign({}, cur, { due: todayISO(w.due) }) : cur; }
+  const next = store.homework[kind + '-next'], useNext = !!next && now >= atTime(mon, sc.set);
+  const wk = useNext ? mon : new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() - 7);
+  return Object.assign({}, useNext ? next : cur, { due: todayISO(atTime(wk, sc.due)) });
+}
 // Birthdays synced from Arbor (birthdays/<year>, see api/sync-birthdays.js) replace the typed-in list.
 const bdaySlide = (y, s) => s.type === 'birthdays' && store.bdays[y] && store.bdays[y].source === 'arbor' ? Object.assign({}, s, { people: store.bdays[y].people || '' }) : s;
 function hwSlide(y, s) {
   if (s.type !== 'stat' && s.type !== 'breakdown') return s;
-  const kind = hwSource(s), d = kind && store.homework[kind], yd = d && d.years && d.years[y];
+  const kind = hwSource(s), d = kind && hwDoc(kind), yd = d && d.years && d.years[y];
   if (!yd) return s;
   const b = HW_BANDS[d.what || HOMEWORK[kind].what];
   return s.type === 'stat' ? Object.assign({}, s, { values: yd.groups, groupList: Object.keys(yd.groups).filter(L => !hwHidden(y, L)).sort((a, c) => a.localeCompare(c, 'en', { numeric: true })), metric: b.metric + dueNote(kind, d), unit: b.unit })
@@ -2079,7 +2092,7 @@ function viewEditSide(y, side) {
     const id = 'sl-' + s.id + '-src', cur = hwSource(s);
     const sel = h('select', { id }, h('option', { value: '', text: 'Typed in below' }), Object.entries(HOMEWORK).map(([k, v]) => h('option', { value: k, text: v.name + ' upload' })));
     sel.value = cur;
-    const d = cur && store.homework[cur];
+    const d = cur && hwDoc(cur);
     const note = h('p', { class: 'hint', text: !cur ? '' : d && d.source === 'tutor-slides' ? 'Using ' + HOMEWORK[cur].name + ' from Tutor Slides, updated ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.'
       : d && d.uploadedAt ? 'Using the ' + HOMEWORK[cur].name + ' upload from ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.'
       : TUTOR_SLIDES ? 'Tutor Slides has no ' + HOMEWORK[cur].name + ' numbers yet, so the boxes below are shown.'
