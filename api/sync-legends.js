@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     if (!feed.ok) throw new Error('Arbor feed answered ' + feed.status);
     const r = legends(await feed.text(), feed.headers.get('content-type') || '', { behaviour: env.LEGENDS_BEHAVIOUR });
     const saved = await rpc('save_legends', { p_secret: secret, p_rows: r.awards });
-    if (saved.status === 401 || saved.status === 403) throw new Error('The database did not accept LEGENDS_SECRET (' + secret.length + ' characters, starts "' + secret.slice(0, 4) + '"). It should match: select secret from screens.feed_keys where name = \'legends\'; then redeploy.');
+    if (saved.status === 401 || saved.status === 403) throw new Error('The database did not accept LEGENDS_SECRET (' + secret.length + ' characters; it should be 64). It should match: select secret from screens.feed_keys where name = \'legends\'; then redeploy.');
     if (!saved.ok) throw new Error('Supabase answered ' + saved.status + ': ' + (await saved.text()).slice(0, 200));
     // Counts and column names only, never names.
     res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, columns: r.cols, saved: await saved.json() });
