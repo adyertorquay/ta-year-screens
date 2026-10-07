@@ -306,6 +306,11 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .bcard.today { background: linear-gradient(150deg, var(--maroon), #4a0d29); color: #fff; padding-block: 44px; }
 .bcard.today h3 { color: #EBA7BE; }
 .bcard.today p { font-size: 64px; }
+.bcard.today p + p { margin-top: 6px; }
+.bcard.today.many p { font-size: 44px; }
+.p-bday .pp { display: flex; flex-direction: column; }
+.p-bday .bday { flex: 1; align-content: center; }
+.p-bday .bcard.today { padding: 56px 44px; text-align: center; }
 .p-week .pp { justify-content: center; text-align: center; }
 .wk { display: flex; flex-direction: column; align-items: center; line-height: .85; margin-top: 30px; }
 .wk-w { font-family: var(--display); font-weight: 700; font-size: 220px; letter-spacing: -.03em; }
@@ -557,7 +562,7 @@ function hasContent(s, centre) {
     case 'stat': return Object.values(s.values || {}).some(v => +v > 0);
     case 'breakdown': return (s.segments || []).some(x => +x.value > 0);
     case 'table': return parseTable(s.rows).length > 1;
-    case 'birthdays': return [-1, 0, 1].some(o => { const d = new Date(); d.setDate(d.getDate() + o); return birthdaysOn(s.people, d).length; });
+    case 'birthdays': return birthdaysOn(s.people, new Date()).length > 0; // today's only (Adam, 7 Oct 2026)
     case 'value': return !!s.value;
     case 'poster': return !!s.photo;
     case 'info': return !!(s.title || s.body);
@@ -1642,9 +1647,11 @@ class PortraitStage {
             r.map(t => h('td', { text: t, class: isGrp(t) ? 'grp' : null, style: isGrp(t) ? '--c:' + groupColor(t) : null }))))))));
       }
       case 'birthdays': {
-        const day = o => { const d = new Date(); d.setDate(d.getDate() + o); return birthdaysOn(s.people, d); };
-        const card = (lab, ppl, cls) => h('div', { class: 'bcard ' + cls }, h('h3', { text: lab }), h('p', { text: ppl.length ? ppl.map(p => p.name + (p.group ? ' (' + p.group + ')' : '')).join(', ') : 'No birthdays' }));
-        return wrap('p-bday', pad(h('div', { class: 's-title', text: s.title || 'Happy birthday!' }), h('div', { class: 'bday' }, card('Yesterday', day(-1), ''), card('Today', day(0), 'today'), card('Tomorrow', day(1), ''))));
+        // Only today's birthdays are shown, one per line.
+        const ppl = birthdaysOn(s.people, new Date());
+        return wrap('p-bday', pad(h('div', { class: 's-title', text: s.title || 'Happy birthday!' }), h('div', { class: 'bday' },
+          h('div', { class: 'bcard today' + (ppl.length > 4 ? ' many' : '') }, h('h3', { text: 'Today' }),
+            ...(ppl.length ? ppl.map(p => h('p', { text: p.name + (p.group ? ' (' + p.group + ')' : '') })) : [h('p', { text: 'No birthdays' })])))));
       }
       case 'value':
         return wrap('p-value', pad(h('div', { class: 's-eyebrow', text: s.title || 'Value of the week' }), h('div', { class: 'value-word', text: s.value || '' }),
@@ -2101,7 +2108,7 @@ function viewEditSide(y, side) {
       }
       case 'table': body.append(F('Title', 'title'), F('Small heading (optional)', 'subtitle'), F('Rows', 'rows', 'textarea', { rows: 7, placeholder: 'Name\tTutor\tPoints' }, true)); break;
       case 'birthdays': body.append(F('Title', 'title', 'text', {}, true), F('Students, one per line ("Name, 7B, dd/mm")', 'people', 'textarea', { rows: 6 }, true),
-        h('p', { class: 'note wide', text: store.bdays[y] && store.bdays[y].source === 'arbor' ? 'Birthdays now come from Arbor automatically each morning, so this list is not used.' : 'Used until the Arbor birthdays feed is connected, then birthdays fill in automatically.' })); break;
+        h('p', { class: 'note wide', text: store.bdays[y] && store.bdays[y].source === 'arbor' ? (TUTOR_SLIDES ? 'Birthdays come from Tutor Slides automatically' : 'Birthdays now come from Arbor automatically each morning') + ', so this list is not used. Only today\'s birthdays are shown.' : 'Used until the Arbor birthdays feed is connected, then birthdays fill in automatically.' })); break;
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
