@@ -644,7 +644,9 @@ const hwHidden = (y, L) => HW_HIDDEN_GROUPS.includes(y.slice(1) + L);
 // Which upload a slide reads: chosen in the editor, or guessed from its title.
 const hwSource = s => s.source !== undefined ? s.source : (Object.entries(HOMEWORK).find(([, k]) => new RegExp('^\\s*' + k.name + '\\b', 'i').test(s.title || '')) || [''])[0];
 // "· due Tue 6 Oct" on homework slides (worked out from the column heading for uploads saved before this was stored).
-const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
+// Tutor Slides doesn't say which week its numbers are for, so they are taken as the homework running now.
+const TUTOR_SLIDES = !!(window.SCREENS_BACKEND && window.SCREENS_BACKEND.shared);
+const dueNote = (kind, d) => { const due = d.due || (x => x ? todayISO(x.due) : '')(d.source === 'tutor-slides' ? hwCurrent(kind) : hwDates(kind, d.valueColumn || '')); return due ? ' · due ' + fmtDate(due, { weekday: 'short', day: 'numeric', month: 'short' }) : ''; };
 // Birthdays synced from Arbor (birthdays/<year>, see api/sync-birthdays.js) replace the typed-in list.
 const bdaySlide = (y, s) => s.type === 'birthdays' && store.bdays[y] && store.bdays[y].source === 'arbor' ? Object.assign({}, s, { people: store.bdays[y].people || '' }) : s;
 function hwSlide(y, s) {
@@ -979,7 +981,7 @@ function viewLogin(a, want) {
       h('p', { text: 'You can edit screens, but you haven\'t been added to a year team yet. Ask the screens administrator to add you.' })];
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
-      h('div', { class: 'years-go' }, a.years.map(editLink), h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
+      h('div', { class: 'years-go' }, a.years.map(editLink), TUTOR_SLIDES ? null : h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1734,6 +1736,7 @@ function viewHomework() {
   const tok = routeTok;
   access().then(a => {
     if (tok !== routeTok) return;
+    if (TUTOR_SLIDES) { body.replaceChildren(h('p', { class: 'hint', text: 'Homework numbers come straight from Tutor Slides, so there is nothing to upload here.' })); return; }
     if (a.state !== 'ok') { body.replaceChildren(h('p', { class: 'hint', text: 'Only year team editors can upload homework reports.' })); return; }
     const p = homeworkPanel(); hwCards = [...p.querySelectorAll('.hw-card')]; body.replaceChildren(p);
   }).catch(() => {});
@@ -2026,7 +2029,10 @@ function viewEditSide(y, side) {
     const sel = h('select', { id }, h('option', { value: '', text: 'Typed in below' }), Object.entries(HOMEWORK).map(([k, v]) => h('option', { value: k, text: v.name + ' upload' })));
     sel.value = cur;
     const d = cur && store.homework[cur];
-    const note = h('p', { class: 'hint', text: !cur ? '' : d && d.uploadedAt ? 'Using the ' + HOMEWORK[cur].name + ' upload from ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.' : 'No ' + HOMEWORK[cur].name + ' upload yet, so the boxes below are shown. Upload it on the home page.' });
+    const note = h('p', { class: 'hint', text: !cur ? '' : d && d.source === 'tutor-slides' ? 'Using ' + HOMEWORK[cur].name + ' from Tutor Slides, updated ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.'
+      : d && d.uploadedAt ? 'Using the ' + HOMEWORK[cur].name + ' upload from ' + agoText(d.uploadedAt) + '. The boxes below are ignored while it has numbers for this year.'
+      : TUTOR_SLIDES ? 'Tutor Slides has no ' + HOMEWORK[cur].name + ' numbers yet, so the boxes below are shown.'
+      : 'No ' + HOMEWORK[cur].name + ' upload yet, so the boxes below are shown. Upload it on the home page.' });
     sel.addEventListener('change', () => { s.source = sel.value; touch(); render(); });
     return h('div', { class: 'wide' }, h('label', { class: 'f', for: id }, 'Numbers come from', sel), note);
   }

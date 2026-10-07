@@ -6,6 +6,11 @@
   const CFG = window.SCREENS_CONFIG || {};
   const live = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase);
   const BUCKET = 'screen-media';
+  // Sharing the Tutor Slides Supabase project: the screens' own tables live in the "screens" schema, and house points,
+  // birthdays and homework are read from Tutor Slides' tables (supabase/schema-tutor-slides.sql).
+  const SHARED = !!CFG.TUTOR_SLIDES;
+  const SCHEMA = SHARED ? 'screens' : 'public';
+  const isFeed = p => SHARED && /^(housepoints|birthdays|homework)\//.test(p);
   const refused = () => Object.assign(new Error('Not allowed'), { code: 'invalid_argument' });
   const snap = d => ({ exists: d != null, data: () => d });
 
@@ -43,27 +48,30 @@
 
   // ---------- Supabase ----------
   function supabaseBackend() {
-    const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+    const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true }, db: { schema: SCHEMA } });
     const watchers = {}, cache = {};
     let channel = null;
     const fire = (p, d) => { cache[p] = d; (watchers[p] || []).forEach(fn => fn(snap(d))); };
     function listen() {
       if (channel) return;
       channel = sb.channel('screen_docs')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'screen_docs' }, ev => {
+        .on('postgres_changes', { event: '*', schema: SCHEMA, table: 'screen_docs' }, ev => {
           const row = ev.new && ev.new.path ? ev.new : ev.old;
           if (row && row.path && watchers[row.path]) fire(row.path, ev.eventType === 'DELETE' ? null : ev.new.data);
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'screen_staff' }, () => { if (watchers['config/staff']) loadStaffDoc(); })
+        .on('postgres_changes', { event: '*', schema: SCHEMA, table: 'screen_staff' }, () => { if (watchers['config/staff']) loadStaffDoc(); })
         .subscribe(status => { if (status === 'SUBSCRIBED') Object.keys(watchers).forEach(refetch); });
     }
     async function refetch(p) {
       if (p === 'config/staff') return loadStaffDoc();
+      if (isFeed(p)) { const { data, error } = await sb.rpc('shared_doc', { doc_path: p }); if (!error) fire(p, data || null); return; }
       const { data, error } = await sb.from('screen_docs').select('data').eq('path', p).maybeSingle();
       if (!error) fire(p, data ? data.data : null);
     }
     // TVs run all day: re-read everything when the tab wakes or the network comes back.
     addEventListener('online', () => Object.keys(watchers).forEach(refetch));
+    // Tutor Slides feeds have no live updates, so they are re-read every five minutes.
+    if (SHARED) setInterval(() => Object.keys(watchers).filter(p => isFeed(p) && watchers[p].length).forEach(refetch), 5 * 60e3);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) Object.keys(watchers).forEach(refetch); });
 
     // "Year teams" is the screen_staff table: editors and the years they may edit.
@@ -92,12 +100,18 @@
     const signedUrls = {};
     return {
       mode: 'live',
+      shared: SHARED,
       async init() {
         const { data } = await sb.auth.getSession(); session = data.session;
         sb.auth.onAuthStateChange((ev, s) => { const was = session && session.user.id; session = s; if (ev === 'SIGNED_OUT' || (s && s.user.id !== was && was)) location.reload(); });
-        if (session) {
+        const loadProfile = async () => {
           const { data: p } = await sb.from('screen_staff').select('user_id, name, email, role, years').eq('user_id', session.user.id).maybeSingle();
           profile = p || null;
+        };
+        if (session) {
+          await loadProfile();
+          // Sign-ins are shared with Tutor Slides, so a school account joins the screens (as a viewer) on its first visit.
+          if (!profile && SHARED) { await sb.rpc('join'); await loadProfile(); }
         }
       },
       signedIn: () => !!session && !!profile,
@@ -117,6 +131,7 @@
         },
         async set(d) {
           if (p === 'config/staff') return saveStaffDoc(d);
+          if (isFeed(p)) throw refused(); // comes from Tutor Slides
           const { error } = await sb.from('screen_docs').upsert({ path: p, data: d, updated_at: new Date().toISOString(), updated_by: session && session.user.id });
           if (error) throw (error.code === '42501' || /row-level security/i.test(error.message) ? refused() : error);
           fire(p, d);

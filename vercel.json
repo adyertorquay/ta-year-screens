@@ -32,15 +32,5 @@
         }
       ]
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/sync-house-points",
-      "schedule": "0 7 * * 1-5"
-    },
-    {
-      "path": "/api/sync-birthdays",
-      "schedule": "0 5 * * *"
-    }
   ]
 }

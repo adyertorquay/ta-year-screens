@@ -29,17 +29,28 @@ If `config.js` has no Supabase keys, the site runs in demo mode:
 - Changes are saved in your own browser only.
 - Uploaded images are kept in your browser too (large or many images may not fit).
 
-## Going live
+## Going live (in the Tutor Slides Supabase project)
 
-1. **Create a new Supabase project** for the screens. Do **not** use the Tutor Slides project.
-2. **Run `supabase/schema.sql`** in that project's SQL editor. This creates two tables (`screen_staff` and `screen_docs`), the access rules, live updates and a private `screen-media` image bucket.
-3. **Add the keys.** In Supabase, open Project Settings, then API. Copy the Project URL and the anon public key into `config.js`, then commit. Vercel redeploys automatically.
-4. **Turn off public sign-ups.** In Supabase, open Authentication, then Sign In / Providers, and turn off "Allow new users to sign up". Accounts should only be made by you.
-5. **Create accounts** in Authentication, then Users, then Add user. Use an email and password, and tick auto-confirm. Every new account can only view the screens.
-6. **Make yourself an admin.** Sign in once, then run this in the SQL editor:
-   `update screen_staff set role = 'admin' where email = 'you@tqacademy.co.uk';`
-7. **Set up the year teams.** Open `/#staff`, add each member of staff and tick their year. They can then edit only that year, and the database enforces this.
-8. **Set up the TVs.** Give each TV its own view-only account. Sign it in once, open its screen address, and press Full screen. TVs stay signed in, update live and reload themselves each night at about 4am.
+The screens share the Tutor Slides Supabase project, so there is no second project to pay for. They keep their own tables in a separate `screens` schema and only **read** Tutor Slides' `house_points`, `students`, `homework`, `hidden_pupils` and `hidden_homework` tables. Nothing in Tutor Slides is changed.
+
+1. **Run `supabase/schema-tutor-slides.sql`** in the Tutor Slides project's SQL editor. It creates the `screens` schema (`screen_staff`, `screen_docs`, access rules, live updates), a private `screen-media` image bucket, and `screens.shared_doc()`, which turns the Tutor Slides tables into the house points, birthdays and homework the screens show. It is safe to run again.
+2. **Expose the schema.** In Supabase, open Project Settings, then Data API, and add `screens` to Exposed schemas.
+3. **Add the keys.** From Project Settings, then API, copy the Project URL and the anon public key into `config.js` (leave `TUTOR_SLIDES: true`), then commit. Vercel redeploys automatically.
+4. **Sign in** to the screens with your usual Tutor Slides login. Any @tqacademy.co.uk account becomes a viewer on its first visit.
+5. **Make yourself an admin** in the SQL editor:
+   `update screens.screen_staff set role = 'admin' where email = 'you@tqacademy.co.uk';`
+6. **Set up the year teams.** Open `/#staff`, add each member of staff and tick their year. They can then edit only that year, and the database enforces this.
+7. **Set up the TVs.** Give each TV its own view-only login (Authentication, then Users, then Add user). A TV login on a non-school address is added with the SQL at the end of the setup file. Sign it in once, open its screen address, and press Full screen. TVs stay signed in, update live and reload themselves each night at about 4am.
+
+### What comes from Tutor Slides
+
+| Screens show | Read from | What leaves the database |
+|---|---|---|
+| House points (centre screens) | `house_points` joined to `students` for the year | Points per house per year |
+| Birthdays (right screens) | `students.dob` | First name, surname initial, tutor group and day/month, three days ago to a week ahead. Never the full date of birth or age |
+| Homework race and breakdown slides | `homework` (`sparx_maths`, `sparx_reader`, `sparx_science`, `tassomai`) | Tutor group and whole-year figures only. Pupils in `hidden_pupils` or `hidden_homework` and the groups 10PFH and 11JAG are left out |
+
+These are re-read every five minutes, so the morning homework upload in Tutor Slides reaches the screens without a second upload. The Homework uploads page, and the Arbor syncs below, are only needed for a separate screens-only project (`supabase/schema.sql`, with `TUTOR_SLIDES: false` in `config.js`).
 
 ## Roles
 
@@ -50,6 +61,8 @@ If `config.js` has no Supabase keys, the site runs in demo mode:
 | admin | Edit everything, and manage year teams |
 
 ## House points from Arbor
+
+_Only for a separate screens-only project. With `TUTOR_SLIDES: true` these come from Tutor Slides instead, and the daily schedule is not set up: to use this sync, add it back to `crons` in `vercel.json`._
 
 House points are read from an Arbor **live feed** (a report published as CSV or JSON). They then replace the typed-in house points on every screen, and the editor shows them as automatic.
 
@@ -89,6 +102,8 @@ House points are read from an Arbor **live feed** (a report published as CSV or 
 If it picks the wrong column, set `ARBOR_POINTS_COLUMN`, `ARBOR_HOUSE_COLUMN`, `ARBOR_GROUP_COLUMN` or `ARBOR_YEAR_COLUMN` to the exact heading.
 
 ## Birthdays from Arbor
+
+_Only for a separate screens-only project. With `TUTOR_SLIDES: true` these come from Tutor Slides instead, and the daily schedule is not set up: to use this sync, add it back to `crons` in `vercel.json`._
 
 `api/sync-birthdays.js` reads an Arbor student report with the columns **Student, Year Group, Reg. Form, Next Birthday** (Age on Next Birthday is ignored) and fills the Birthdays slide on each year's right-hand screen. It runs every morning at 5am (UTC).
 
@@ -173,8 +188,9 @@ Both of these are set near the top of the script in `index.html`:
 |---|---|
 | `index.html` | The whole app: screens, editors, sign-in |
 | `backend.js` | Supabase (live) or demo data, sign-in and image storage |
-| `config.js` | Supabase URL and anon key |
-| `supabase/schema.sql` | Database setup |
+| `config.js` | Supabase URL, anon key, and whether the screens share the Tutor Slides project |
+| `supabase/schema-tutor-slides.sql` | Database setup in the Tutor Slides project (the `screens` schema and the read-only Tutor Slides feeds) |
+| `supabase/schema.sql` | Database setup for a separate screens-only project |
 | `api/sync-birthdays.js`, `lib/birthdays.js` | Daily Arbor birthdays sync |
 | `supabase/schedule.sql` | Optional 10-minute house points refresh |
 | `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |
