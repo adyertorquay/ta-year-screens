@@ -89,7 +89,7 @@
       loadStaffDoc();
     }
 
-    let session = null, profile = null;
+    let session = null, profile = null, problem = '';
     const people = {};
     const toProfile = r => ({ id: r.user_id, name: r.name || r.email || '', avatarUrl: avatar(r.name || r.email || ''), isMe: !!session && r.user_id === session.user.id, guest: false, email: r.email || null });
     const me = () => {
@@ -105,8 +105,10 @@
         const { data } = await sb.auth.getSession(); session = data.session;
         sb.auth.onAuthStateChange((ev, s) => { const was = session && session.user.id; session = s; if (ev === 'SIGNED_OUT' || (s && s.user.id !== was && was)) location.reload(); });
         const loadProfile = async () => {
-          const { data: p } = await sb.from('screen_staff').select('user_id, name, email, role, years').eq('user_id', session.user.id).maybeSingle();
+          const { data: p, error } = await sb.from('screen_staff').select('user_id, name, email, role, years').eq('user_id', session.user.id).maybeSingle();
           profile = p || null;
+          // Shown on the "not set up" page, so a setup problem can be told apart from a missing account.
+          problem = error ? (error.code ? error.code + ': ' : '') + error.message : p ? '' : 'No screens row for ' + (session.user.email || 'this account') + '.';
         };
         if (session) {
           await loadProfile();
@@ -114,6 +116,7 @@
       },
       signedIn: () => !!session && !!profile,
       hasSession: () => !!session,
+      problem: () => problem,
       async signIn(email, password) {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) return 'That login wasn\'t recognised. Check the email and password.';

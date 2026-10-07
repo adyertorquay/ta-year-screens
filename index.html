@@ -943,7 +943,8 @@ function whoChip(me) {
 }
 function signInForm() {
   const B = window.SCREENS_BACKEND || {};
-  if (B.hasSession && B.hasSession()) return [h('p', { text: 'You\'re signed in, but this account isn\'t set up for the screens yet. Ask the screens administrator.' }), signOutLink()];
+  if (B.hasSession && B.hasSession()) return [h('p', { text: 'You\'re signed in, but this account isn\'t set up for the screens yet. Ask the screens administrator.' }),
+    B.problem && B.problem() ? h('p', { class: 'hint', text: 'Details: ' + B.problem() }) : null, signOutLink()];
   const msg = h('p', { class: 'form-msg', role: 'alert' });
   const email = h('input', { type: 'email', id: 'si-email', autocomplete: 'username', required: true });
   const pw = h('input', { type: 'password', id: 'si-pw', autocomplete: 'current-password', required: true });
