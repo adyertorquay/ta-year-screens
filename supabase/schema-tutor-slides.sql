@@ -228,6 +228,78 @@ create policy "screen media read" on storage.objects for select to authenticated
 create policy "screen media upload" on storage.objects for insert to authenticated
   with check (bucket_id = 'screen-media' and screens.screen_role() in ('editor', 'admin'));
 
+-- ---------- Learning Legends (Arbor live feed, read by the site's api/sync-legends) ----------
+-- The site fetches the Arbor behaviour feed, keeps only Learning Legends from today and the previous school day, and
+-- hands screens.save_legends() each award's date and "Students Involved" text. The pupils are matched by name to
+-- public.students (read only) to find their year and tutor group, and legends/y7..y11 are written in screens.screen_docs
+-- as "Amy S, 7B" lines (first name, surname initial, tutor group). The sync has no Supabase login: it proves itself
+-- with the secret in screens.feed_keys, which only these functions can read. To see it (for Vercel's LEGENDS_SECRET):
+--   select secret from screens.feed_keys where name = 'legends';
+create table if not exists screens.feed_keys (name text primary key, secret text not null);
+alter table screens.feed_keys enable row level security; -- no policies and no grants: nobody reads it through the API
+insert into screens.feed_keys (name, secret)
+  values ('legends', replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
+on conflict (name) do nothing;
+
+grant usage on schema screens to anon;
+
+-- Is a new sync worth doing? (The TVs ask every few minutes; the Arbor feed is read at most every four.)
+create or replace function screens.legends_due() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select not exists (select 1 from screens.screen_docs where path = 'legends/y7' and updated_at > now() - interval '4 minutes')
+$$;
+
+create or replace function screens.save_legends(p_secret text, p_rows jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  today date := (now() at time zone 'Europe/London')::date;
+  prev  date := today - case extract(isodow from (now() at time zone 'Europe/London')::date)::int when 1 then 3 when 7 then 2 else 1 end;
+  n_rows int; n_hits int; n_missed int; yr int;
+begin
+  if p_secret is null or p_secret <> (select secret from screens.feed_keys where name = 'legends') then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 5000 then raise exception 'bad rows'; end if;
+
+  create temp table _ll on commit drop as
+  with r as (
+    select row_number() over () as id, lower(x ->> 'students') as raw, (x ->> 'date')::date as d
+      from jsonb_array_elements(p_rows) x
+     where (x ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (x ->> 'date')::date in (today, prev)
+  ),
+  pupils as ( -- every way Arbor might write the name, escaped for a whole-word match
+    select s.upn, s.year_group::text as y, coalesce(s.form, '') as form, trim(s.forename) as forename, trim(s.surname) as surname, n
+      from public.students s,
+           lateral (values (trim(s.forename) || ' ' || trim(s.surname)), (split_part(trim(s.forename), ' ', 1) || ' ' || trim(s.surname)),
+                           (trim(s.surname) || ', ' || trim(s.forename)), (trim(s.surname) || ', ' || split_part(trim(s.forename), ' ', 1))) v(n)
+     where s.year_group::text in ('7', '8', '9', '10', '11') and coalesce(s.forename, '') <> '' and coalesce(s.surname, '') <> ''
+  )
+  select distinct r.id, r.d, p.upn, p.y, p.form, p.forename, p.surname
+    from r join pupils p
+      on r.raw ~ ('(^|[^a-z])' || regexp_replace(lower(p.n), '([.^$*+?()\[\]{}|\\-])', '\\\1', 'g') || '($|[^a-z])');
+
+  select count(*) into n_rows from jsonb_array_elements(p_rows) x where (x ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (x ->> 'date')::date in (today, prev);
+  select count(distinct id) into n_hits from _ll;
+  n_missed := n_rows - n_hits;
+
+  foreach yr in array array[7, 8, 9, 10, 11] loop
+    insert into screens.screen_docs (path, data, updated_at)
+    select 'legends/y' || yr, jsonb_build_object('source', 'arbor', 'updatedAt', now(), 'today', today, 'previous', prev,
+             'todayList', coalesce((select string_agg(line, e'\n' order by form, line) from
+                 (select distinct split_part(forename, ' ', 1) || ' ' || upper(left(surname, 1)) || ', ' || form as line, form from _ll where _ll.y = yr::text and d = today) t), ''),
+             'previousList', coalesce((select string_agg(line, e'\n' order by form, line) from
+                 (select distinct split_part(forename, ' ', 1) || ' ' || upper(left(surname, 1)) || ', ' || form as line, form from _ll where _ll.y = yr::text and d = prev) t), '')),
+           now()
+    on conflict (path) do update set data = excluded.data, updated_at = excluded.updated_at;
+  end loop;
+  return jsonb_build_object('rows', n_rows, 'matched', n_hits, 'unmatched', n_missed);
+end $$;
+
+revoke all on function screens.legends_due() from public;
+revoke all on function screens.save_legends(text, jsonb) from public;
+grant execute on function screens.legends_due() to anon, authenticated;
+grant execute on function screens.save_legends(text, jsonb) to anon, authenticated;
+
 -- ---------- starting content ----------
 insert into screens.screen_docs (path, data) values
   ('config/houses', '{"mascots":{"B":"media/mascot-B.png","C":"media/mascot-C.png","D":"media/mascot-D.png","F":"media/mascot-F.png","H":"media/mascot-H.png","K":"media/mascot-K.png","N":"media/mascot-N.png","P":"media/mascot-P.png"}}')

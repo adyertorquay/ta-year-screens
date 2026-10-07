@@ -118,6 +118,20 @@ Only these are saved, per year in `birthdays/<year>`: first name, surname initia
 
 Once it has run, the typed-in list in the Birthdays slide editor is no longer used. If it picks the wrong column, set `ARBOR_STUDENT_COLUMN`, `ARBOR_YEAR_COLUMN`, `ARBOR_FORM_COLUMN` or `ARBOR_BIRTHDAY_COLUMN` to the exact heading.
 
+## Learning Legends from Arbor
+
+`api/sync-legends.js` reads the Arbor behaviour live feed (columns **Date/Time, Severity, Behaviour, Students Involved, Status**), keeps only rows whose Behaviour says "Learning Legends", and fills the list slides titled "Today's Learning Legends" and "Yesterday's Learning Legends" on the left screens. "Yesterday" is the previous school day (Friday on a Monday).
+
+The feed has no year or tutor group, so `screens.save_legends()` matches each name to the Tutor Slides `students` table in the database. It saves `legends/<year>` as "Amy T, 7B" lines (first name, surname initial, tutor group). Names it can't match are counted but not shown.
+
+The TVs call the sync every five minutes while they're on, and the database lets it read Arbor at most every four minutes, so no schedule is needed. It uses no Supabase password or service key: a secret only lets it write the five `legends/` entries.
+
+1. In Arbor, set the feed's output format to **JSON** and copy its address.
+2. Run `supabase/schema-tutor-slides.sql` again. In Data API, Exposed functions, turn on `legends_due` and `save_legends`.
+3. Get the secret: `select secret from screens.feed_keys where name = 'legends';`
+4. In Vercel, add `ARBOR_LEGENDS_FEED_URL` (the feed address) and `LEGENDS_SECRET` (that secret), then redeploy.
+5. Open `https://<your-site>/api/sync-legends`. It shows how many feed rows and Learning Legends it found and how many names matched. It never shows names.
+
 ## Celebrations for every year
 
 Each celebration has a "Show on" choice. "All year groups" (the default for new ones) saves it to `celebrations/all`, so it shows on every year's centre screen and can be edited from any year's editor. "Year N only" keeps it on that year's screen. Editors may write `celebrations/all` (see `supabase/schema.sql`).
@@ -188,6 +202,7 @@ Both of these are set near the top of the script in `index.html`:
 | `config.js` | Supabase URL, anon key, and whether the screens share the Tutor Slides project |
 | `supabase/schema-tutor-slides.sql` | Database setup in the Tutor Slides project (the `screens` schema and the read-only Tutor Slides feeds) |
 | `supabase/schema.sql` | Database setup for a separate screens-only project |
+| `api/sync-legends.js`, `lib/legends.js` | Learning Legends from the Arbor behaviour feed |
 | `api/sync-birthdays.js`, `lib/birthdays.js` | Daily Arbor birthdays sync |
 | `supabase/schedule.sql` | Optional 10-minute house points refresh |
 | `api/sync-house-points.js`, `lib/housepoints.js` | Arbor feed to house points sync |

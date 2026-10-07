@@ -577,7 +577,7 @@ function hasContent(s, centre) {
 
 // ---------- data ----------
 let db = null, assets = null, user = null, dbState = 'loading';
-const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {}, bdays: {} };
+const store = { screens: {}, lessons: {}, timetable: {}, seen: {}, mascots: null, rawCentre: {}, hp: {}, bdays: {}, legends: {} };
 // House points synced from Arbor (housepoints/<year>, else housepoints/all) replace the typed-in ones.
 const syncedHP = y => { const d = store.hp[y] || store.hp.all; return d && d.points ? d : null; };
 // Whole-school celebrations (celebrations/all) show on every year's centre screen, before the year's own.
@@ -602,6 +602,7 @@ function subscribe(y) {
     db.doc('screens/' + y).onSnapshot(s => { store.rawCentre[y] = s.exists ? s.data() : null; withHP(y); store.seen[y] = true; emit(y); }, e => console.warn('screen', e)),
     db.doc('housepoints/' + y).onSnapshot(s => { store.hp[y] = s.exists ? s.data() : null; withHP(y); emit(y); }, e => console.warn('hp', e)),
     db.doc('birthdays/' + y).onSnapshot(s => { store.bdays[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('birthdays', e)),
+    db.doc('legends/' + y).onSnapshot(s => { store.legends[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('legends', e)),
     db.doc('lessons/' + y).onSnapshot(s => { store.lessons[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('lessons', e)),
     db.doc('timetable/' + y).onSnapshot(s => { store.timetable[y] = s.exists ? s.data() : null; emit(y); }, e => console.warn('timetable', e)),
   ];
@@ -669,6 +670,16 @@ function hwDoc(kind, now = new Date()) {
 }
 // Birthdays synced from Arbor (birthdays/<year>, see api/sync-birthdays.js) replace the typed-in list.
 const bdaySlide = (y, s) => s.type === 'birthdays' && store.bdays[y] && store.bdays[y].source === 'arbor' ? Object.assign({}, s, { people: store.bdays[y].people || '' }) : s;
+// Learning Legends from the Arbor feed (legends/<year>, see api/sync-legends.js) replace the typed-in names on list
+// slides titled "... Learning Legends": "Yesterday's" gets the previous school day's, the others today's.
+const legendsSlide = (y, s) => {
+  const d = store.legends[y];
+  if (s.type !== 'list' || !d || d.source !== 'arbor' || !/learning legend/i.test(s.title || '')) return s;
+  const prev = /yesterday|previous|last/i.test(s.title || '');
+  // Stale data (e.g. the feed stopped) shows nothing rather than an old day's names.
+  if (d.today !== todayISO()) return Object.assign({}, s, { items: '' });
+  return Object.assign({}, s, { items: prev ? d.previousList || '' : d.todayList || '' });
+};
 function hwSlide(y, s) {
   if (s.type !== 'stat' && s.type !== 'breakdown') return s;
   const kind = hwSource(s), d = kind && hwDoc(kind), yd = d && d.years && d.years[y];
@@ -1606,7 +1617,7 @@ class PortraitStage {
   }
   destroy() { clearInterval(this.timer); this.fx.stop(); this.ro.disconnect(); this.fit.remove(); }
   setData(sideDoc, centreDoc, les) {
-    this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => bdaySlide(this.year, hwSlide(this.year, x))) }); this.centre = normal(centreDoc); this.les = les || null;
+    this.data = normalSide(sideDoc); this.data = Object.assign({}, this.data, { slides: this.data.slides.map(x => legendsSlide(this.year, bdaySlide(this.year, hwSlide(this.year, x)))) }); this.centre = normal(centreDoc); this.les = les || null;
     this.buildSlides(); this.renderNext(true);
   }
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
@@ -2107,7 +2118,8 @@ function viewEditSide(y, side) {
     const body = h('div', { class: 'item' });
     switch (s.type) {
       case 'list': body.append(F('Title', 'title', 'text', {}, true), F('Small heading (optional)', 'subtitle', 'text', {}, true),
-        F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true)); break;
+        F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true),
+        ...(/learning legend/i.test(s.title || '') && store.legends[y] && store.legends[y].source === 'arbor' ? [h('p', { class: 'note wide', text: 'Learning Legends come from Arbor automatically, so the names typed here are not shown.' })] : [])); break;
       case 'stat': body.append(hwSourceRow(s, render), F('Title', 'title'), F('What the number means', 'metric'), F('Unit (e.g. %)', 'unit'),
         h('div', { class: 'wide groups-form' }, groupsOf(store.screens[y]).map(L => h('div', { style: '--hc:' + suffixColor(L) },
           field(y.slice(1) + L, 'sl-' + s.id + '-v' + L, (s.values || {})[L] ?? '', v => { s.values = s.values || {}; s.values[L] = v; }, 'number', { step: 'any', inputmode: 'decimal' }))))); break;
@@ -2216,6 +2228,8 @@ route();
     dbState = db ? 'on' : 'off';
   } catch (e) { dbState = 'off'; }
   route();
+  // Signed-in screens keep the Learning Legends feed fresh (the server reads Arbor at most every few minutes).
+  if (dbState === 'on' && TUTOR_SLIDES) { const kick = () => fetch('api/sync-legends', { cache: 'no-store' }).catch(() => {}); kick(); setInterval(kick, 5 * 60e3); }
 })();
 })();
 </script>
