@@ -6,7 +6,7 @@
    (For a separate screens-only project instead, run supabase/schema.sql and set TUTOR_SLIDES: false.)
    The anon key is safe to publish; the database's row-level security decides who can read and write. */
 window.SCREENS_CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_URL: 'https://ndtkywnmlgvycjnynyol.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_qBUizGF0KPv5LsgSALQpOw_Qz7B8f8q',
   TUTOR_SLIDES: true,
 };
