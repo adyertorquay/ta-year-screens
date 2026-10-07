@@ -16,7 +16,7 @@
 -- After running it, in Supabase open Project Settings, then Data API, and add "screens" to Exposed schemas.
 --
 -- Roles (screens.screen_staff.role):
---   viewer  can see the screens (TVs, and any school account that signs in)
+--   viewer  can see the screens
 --   editor  can also edit the screens for the years listed in screen_staff.years ('all' = every year)
 --   admin   can edit everything and manage who is an editor
 
@@ -65,19 +65,9 @@ language sql stable security definer set search_path = '' as $$
   ), false)
 $$;
 
--- The project's sign-ins are shared with Tutor Slides, so nobody is added to the screens automatically on sign-up.
--- Instead the page calls this after sign-in: a school account (@tqacademy.co.uk) becomes a viewer the first time.
--- Anyone else (for example a TV account on another address) is added by hand, see the end of this file.
-create or replace function screens.join() returns void
-language plpgsql security definer set search_path = '' as $$
-declare u record;
-begin
-  select id, email, raw_user_meta_data from auth.users where id = auth.uid() into u;
-  if u.id is null or lower(u.email) not like '%@tqacademy.co.uk' then return; end if;
-  insert into screens.screen_staff (user_id, email, name)
-  values (u.id, u.email, coalesce(u.raw_user_meta_data ->> 'name', split_part(u.email, '@', 1)))
-  on conflict (user_id) do nothing;
-end $$;
+-- The project's sign-ins are shared with Tutor Slides, so nobody is added to the screens automatically: only the
+-- accounts listed in screens.screen_staff (the shared Admin account, see the end of this file) can use them.
+drop function if exists screens.join();
 
 -- ---------- row level security ----------
 alter table screens.screen_staff enable row level security;
@@ -221,8 +211,6 @@ end $$;
 
 revoke all on function screens.shared_doc(text) from public, anon;
 grant execute on function screens.shared_doc(text) to authenticated;
-revoke all on function screens.join() from public, anon;
-grant execute on function screens.join() to authenticated;
 grant execute on function screens.screen_role() to authenticated;
 grant execute on function screens.screen_can_write(text) to authenticated;
 
@@ -243,11 +231,10 @@ insert into screens.screen_docs (path, data) values
   ('config/houses', '{"mascots":{"B":"media/mascot-B.png","C":"media/mascot-C.png","D":"media/mascot-D.png","F":"media/mascot-F.png","H":"media/mascot-H.png","K":"media/mascot-K.png","N":"media/mascot-N.png","P":"media/mascot-P.png"}}')
 on conflict (path) do nothing;
 
--- ---------- people ----------
--- Make yourself admin (sign in to the screens once first, or use this to add anyone who already has a login):
--- insert into screens.screen_staff (user_id, email, name, role)
---   select id, email, split_part(email, '@', 1), 'admin' from auth.users where email = 'you@tqacademy.co.uk'
---   on conflict (user_id) do update set role = 'admin';
--- A TV or other account on a non-school address (view only):
--- insert into screens.screen_staff (user_id, email, name)
---   select id, email, 'TV Year 7' from auth.users where email = 'tv-y7@example.org' on conflict do nothing;
+-- ---------- the Admin account ----------
+-- One shared login for editing and for the TVs. BEFORE running this file, create it in Supabase:
+-- Authentication, then Users, then Add user: email screens@tqacademy.co.uk (no mailbox needed), a strong password,
+-- and tick Auto Confirm User. If the account doesn't exist yet, this line does nothing; just run the file again.
+insert into screens.screen_staff (user_id, email, name, role)
+  select id, email, 'Admin', 'admin' from auth.users where lower(email) = 'screens@tqacademy.co.uk'
+  on conflict (user_id) do update set role = 'admin', name = 'Admin';

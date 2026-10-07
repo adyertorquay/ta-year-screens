@@ -110,8 +110,6 @@
         };
         if (session) {
           await loadProfile();
-          // Sign-ins are shared with Tutor Slides, so a school account joins the screens (as a viewer) on its first visit.
-          if (!profile && SHARED) { await sb.rpc('join'); await loadProfile(); }
         }
       },
       signedIn: () => !!session && !!profile,

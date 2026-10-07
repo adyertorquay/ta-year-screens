@@ -33,14 +33,11 @@ If `config.js` has no Supabase keys, the site runs in demo mode:
 
 The screens share the Tutor Slides Supabase project, so there is no second project to pay for. They keep their own tables in a separate `screens` schema and only **read** Tutor Slides' `house_points`, `students`, `homework`, `hidden_pupils` and `hidden_homework` tables. Nothing in Tutor Slides is changed.
 
-1. **Run `supabase/schema-tutor-slides.sql`** in the Tutor Slides project's SQL editor. It creates the `screens` schema (`screen_staff`, `screen_docs`, access rules, live updates), a private `screen-media` image bucket, and `screens.shared_doc()`, which turns the Tutor Slides tables into the house points, birthdays and homework the screens show. It is safe to run again.
-2. **Expose the schema.** In Supabase, open Project Settings, then Data API, and add `screens` to Exposed schemas.
-3. **Add the keys.** From Project Settings, then API, copy the Project URL and the anon public key into `config.js` (leave `TUTOR_SLIDES: true`), then commit. Vercel redeploys automatically.
-4. **Sign in** to the screens with your usual Tutor Slides login. Any @tqacademy.co.uk account becomes a viewer on its first visit.
-5. **Make yourself an admin** in the SQL editor:
-   `update screens.screen_staff set role = 'admin' where email = 'you@tqacademy.co.uk';`
-6. **Set up the year teams.** Open `/#staff`, add each member of staff and tick their year. They can then edit only that year, and the database enforces this.
-7. **Set up the TVs.** Give each TV its own view-only login (Authentication, then Users, then Add user). A TV login on a non-school address is added with the SQL at the end of the setup file. Sign it in once, open its screen address, and press Full screen. TVs stay signed in, update live and reload themselves each night at about 4am.
+1. **Create the Admin login.** In Supabase, open Authentication, then Users, then Add user. Use the email `screens@tqacademy.co.uk` (it doesn't need a real mailbox), a strong password, and tick Auto Confirm User. This one login is used for editing and on every TV.
+2. **Run `supabase/schema-tutor-slides.sql`** in the Tutor Slides project's SQL editor. It creates the `screens` schema (`screen_staff`, `screen_docs`, access rules, live updates), a private `screen-media` image bucket, and `screens.shared_doc()`, which turns the Tutor Slides tables into the house points, birthdays and homework the screens show. It makes the Admin login an admin of the screens. It is safe to run again.
+3. **Expose the schema.** In Supabase, open Project Settings, then Data API, and add `screens` to Exposed schemas.
+4. **Add the keys.** From Project Settings, then API, copy the Project URL and the anon public key into `config.js` (leave `TUTOR_SLIDES: true`), then commit. Vercel redeploys automatically.
+5. **Set up the TVs.** On each TV, sign in once as Admin, open its screen address, and press Full screen. TVs stay signed in, update live and reload themselves each night at about 4am. Other Tutor Slides logins can't open the screens unless they are added to `screens.screen_staff`.
 
 ### What comes from Tutor Slides
 
