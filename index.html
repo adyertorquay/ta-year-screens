@@ -82,6 +82,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 body.tv .demo-bar { display: none; }
 .signin-card .years-go { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .signin-card .years-go .btn:first-child:last-child { grid-column: 1 / -1; }
+/* an odd one out (Year 11) sits centred under the others */
+.signin-card .years-go .btn:last-child:nth-child(odd):not(:first-child) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 4px); }
 .signin-card .foot { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: .9rem; }
 .who { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-weight: 600; margin: 0 auto; max-width: 100%; }
 .who img { width: 30px; height: 30px; border-radius: 50%; flex: none; }
