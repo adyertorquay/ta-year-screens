@@ -19,6 +19,8 @@ function siteConfig() {
 
 module.exports = async (req, res) => {
   const env = process.env;
+  // Pasting into Vercel can bring a stray space, line break or quotes along with the secret.
+  const secret = String(env.LEGENDS_SECRET || '').trim().replace(/^["']+|["']+$/g, '');
   res.setHeader('cache-control', 'no-store');
   const missing = ['ARBOR_LEGENDS_FEED_URL', 'LEGENDS_SECRET'].filter(k => !env[k]);
   if (missing.length) return res.status(500).json({ error: 'Missing settings: ' + missing.join(', ') });
@@ -29,7 +31,7 @@ module.exports = async (req, res) => {
       headers: { apikey: cfg.SUPABASE_ANON_KEY, 'content-type': 'application/json', 'content-profile': 'screens', 'accept-profile': 'screens' },
       body: JSON.stringify(body || {}),
     });
-    const force = req.query && req.query.force === env.LEGENDS_SECRET;
+    const force = req.query && req.query.force === secret;
     if (!force) {
       const due = await rpc('legends_due');
       if (!due.ok) throw new Error('Supabase answered ' + due.status + ': ' + (await due.text()).slice(0, 200));
@@ -38,7 +40,8 @@ module.exports = async (req, res) => {
     const feed = await fetch(env.ARBOR_LEGENDS_FEED_URL, { headers: { accept: 'application/json, text/csv, */*' } });
     if (!feed.ok) throw new Error('Arbor feed answered ' + feed.status);
     const r = legends(await feed.text(), feed.headers.get('content-type') || '', { behaviour: env.LEGENDS_BEHAVIOUR });
-    const saved = await rpc('save_legends', { p_secret: env.LEGENDS_SECRET, p_rows: r.awards });
+    const saved = await rpc('save_legends', { p_secret: secret, p_rows: r.awards });
+    if (saved.status === 401 || saved.status === 403) throw new Error('The database did not accept LEGENDS_SECRET (' + secret.length + ' characters, starts "' + secret.slice(0, 4) + '"). It should match: select secret from screens.feed_keys where name = \'legends\'; then redeploy.');
     if (!saved.ok) throw new Error('Supabase answered ' + saved.status + ': ' + (await saved.text()).slice(0, 200));
     // Counts and column names only, never names.
     res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, columns: r.cols, saved: await saved.json() });
