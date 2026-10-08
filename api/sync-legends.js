@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
     if (saved.status === 401 || saved.status === 403) throw new Error('The database did not accept LEGENDS_SECRET (' + secret.length + ' characters; it should be 64). It should match: select secret from screens.feed_keys where name = \'legends\'; then redeploy.');
     if (!saved.ok) throw new Error('Supabase answered ' + saved.status + ': ' + (await saved.text()).slice(0, 200));
     // Counts and column names only, never names.
-    res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, todayAndPrevious: awards.length, columns: r.cols, saved: await saved.json() });
+    res.status(200).json({ ok: true, feedRows: r.rows, learningLegends: r.awards.length, todayAndPrevious: awards.length, today: awards.filter(a => a.date === keep[0]).length, previousDay: awards.filter(a => a.date === keep[1]).length, newestInFeed: r.awards.map(a => a.date).sort().pop() || null, columns: r.cols, saved: await saved.json() });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
