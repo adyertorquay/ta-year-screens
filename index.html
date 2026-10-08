@@ -545,7 +545,7 @@ const SLIDE_DEFAULTS = {
   info: { title: '', body: '' },
   housepoints: { title: 'House points' },
   sotw: {},
-  week: { title: '', week: '', teachingWeek: '' },
+  week: {},
 };
 const newSlide = type => ({ id: uid(), type, hidden: false, ...clone(SLIDE_DEFAULTS[type] || {}) });
 const normalSide = d => Object.assign({ slides: [], slideSeconds: 12 }, d ? clone(d) : {});
@@ -581,7 +581,7 @@ function hasContent(s, centre) {
     case 'info': return !!(s.title || s.body);
     case 'housepoints': return Object.values(centre.housePoints || {}).some(v => +v > 0);
     case 'sotw': return centre.sotw.students.some(x => x.name);
-    case 'week': return !!(s.week || weekInfo(new Date()));
+    case 'week': return !!weekInfo(new Date());
   }
   return false;
 }
@@ -1695,8 +1695,9 @@ class PortraitStage {
           s.photo ? h('img', { class: 'value-img', src: photoUrl(s.photo), alt: '' }) : null, s.text ? h('p', { class: 'info-p', text: s.text }) : null));
       case 'week': {
         const auto = weekInfo(new Date()) || {};
-        const letter = s.week || auto.letter || '', line = s.week ? (s.teachingWeek ? 'Teaching week ' + s.teachingWeek : '') : weekLine(auto);
-        return wrap('p-week', pad(h('div', { class: 's-eyebrow', text: s.title || VALUES_LINE }),
+        // Always from the school week plan; nothing on it is edited (Adam, 8 Oct 2026), so old saved overrides are ignored.
+        const letter = auto.letter || '', line = weekLine(auto);
+        return wrap('p-week', pad(h('div', { class: 's-eyebrow', text: VALUES_LINE }),
           letter ? h('div', { class: 'wk' }, h('span', { class: 'wk-w', text: 'Week' }), h('span', { class: 'wk-l', text: letter })) : null,
           line ? h('div', { class: 'wk-t' + (letter ? '' : ' solo'), text: line }) : null));
       }
@@ -2128,10 +2129,16 @@ function viewEditSide(y, side) {
     const t = SLIDE_TYPES[s.type] || { label: s.type, hint: '' };
     const F = (label, k, type = 'text', extra = {}, wide = false) => { const f = field(label, 'sl-' + s.id + '-' + k, s[k], v => s[k] = v, type, extra); return wide ? h('div', { class: 'wide' }, f) : f; };
     const body = h('div', { class: 'item' });
-    switch (s.type) {
-      case 'list': body.append(F('Title', 'title', 'text', {}, true), F('Small heading (optional)', 'subtitle', 'text', {}, true),
-        F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true),
-        ...(/learning legend/i.test(s.title || '') && store.legends[y] && store.legends[y].source === 'arbor' ? [h('p', { class: 'note wide', text: 'Learning Legends come from Arbor automatically, so the names typed here are not shown.' })] : [])); break;
+    // Homework and house points come from Tutor Slides, so their slides can't be edited (Adam, 8 Oct 2026).
+    const locked = s.type === 'week' || (TUTOR_SLIDES && (s.type === 'housepoints' || (s.type === 'list' && /learning legend/i.test(s.title || '')) || ((s.type === 'stat' || s.type === 'breakdown') && !!hwSource(s))));
+    const hwKind = TUTOR_SLIDES && (s.type === 'stat' || s.type === 'breakdown') && hwSource(s);
+    if (hwKind) body.append(h('p', { class: 'note wide', text: (d => HOMEWORK[hwKind].name + ' comes from Tutor Slides automatically' + (d && d.uploadedAt ? ' (updated ' + agoText(d.uploadedAt) + ')' : '') + ' and can\'t be edited here.')(hwDoc(hwKind)) }));
+    else if (TUTOR_SLIDES && s.type === 'housepoints') body.append(h('p', { class: 'note wide', text: 'House points come from Tutor Slides automatically and can\'t be edited here.' }));
+    else switch (s.type) {
+      // Learning Legends come from Arbor, so their slides can't be edited (Adam, 8 Oct 2026); only On screen and moving remain.
+      case 'list': if (TUTOR_SLIDES && /learning legend/i.test(s.title || '')) { body.append(h('p', { class: 'note wide', text: 'These names come from Arbor automatically and can\'t be edited here.' })); break; }
+        body.append(F('Title', 'title', 'text', {}, true), F('Small heading (optional)', 'subtitle', 'text', {}, true),
+        F('Students, one per line ("Name, 7B")', 'items', 'textarea', { rows: 6 }, true), F('Shown when the list is empty (leave blank to skip the slide)', 'emptyText', 'text', {}, true)); break;
       case 'stat': body.append(hwSourceRow(s, render), F('Title', 'title'), F('What the number means', 'metric'), F('Unit (e.g. %)', 'unit'),
         h('div', { class: 'wide groups-form' }, groupsOf(store.screens[y]).map(L => h('div', { style: '--hc:' + suffixColor(L) },
           field(y.slice(1) + L, 'sl-' + s.id + '-v' + L, (s.values || {})[L] ?? '', v => { s.values = s.values || {}; s.values[L] = v; }, 'number', { step: 'any', inputmode: 'decimal' }))))); break;
@@ -2150,15 +2157,15 @@ function viewEditSide(y, side) {
       case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
-      case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school week plan (this week: ' + (w => w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : 'no school weeks left in the plan')(weekInfo(new Date())) + '). Fill these in only to override it.' }), F('Week (A or B)', 'week'), F('Teaching week number', 'teachingWeek'), F('Small heading (optional)', 'title', 'text', {}, true)); break;
+      case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school week plan (this week: ' + (w => w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : 'no school weeks left in the plan')(weekInfo(new Date())) + '). There is nothing to edit.' })); break;
       case 'housepoints': body.append(F('Title', 'title', 'text', {}, true)); break;
     }
     const showId = 'sl-' + s.id + '-show';
     const show = h('input', { type: 'checkbox', id: showId }); show.checked = !s.hidden;
-    const summary = h('span', { class: 'stitle', text: s.title || s.value || t.label });
+    const summary = h('span', { class: 'stitle', text: (s.type !== 'week' && (s.title || s.value)) || t.label });
     const card = h('div', { class: 'scard' + (s.hidden ? ' off' : '') + (selected === s.id ? ' sel' : ''), id: 'sc-' + s.id, onfocusin: () => focusSlide(s.id), onclick: () => focusSlide(s.id), oninput: () => { summary.textContent = s.title || s.value || t.label; } },
       h('div', { class: 'shead' }, h('span', { class: 'pill', text: t.label }), summary, h('label', { class: 'showtog', for: showId }, show, 'On screen')),
-      t.hint ? h('p', { class: 'hint', text: t.hint }) : null, body,
+      t.hint && !locked ? h('p', { class: 'hint', text: t.hint }) : null, body,
       h('div', { class: 'tools', style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, moveBtns(draft.slides, i, render), removeBtn(draft.slides, i, render)));
     show.addEventListener('change', () => { s.hidden = !show.checked; card.classList.toggle('off', s.hidden); touch(); });
     return card;
