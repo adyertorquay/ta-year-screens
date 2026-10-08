@@ -254,7 +254,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   today date := (now() at time zone 'Europe/London')::date;
   prev  date := today - case extract(isodow from (now() at time zone 'Europe/London')::date)::int when 1 then 3 when 7 then 2 else 1 end;
-  n_rows int; n_hits int; n_missed int; yr int;
+  n_rows int; n_hits int; n_missed int; yr int; old jsonb; prev_list text;
 begin
   if p_secret is null or p_secret <> (select secret from screens.feed_keys where name = 'legends') then
     raise exception 'not allowed' using errcode = '42501';
@@ -284,12 +284,20 @@ begin
   n_missed := n_rows - n_hits;
 
   foreach yr in array array[7, 8, 9, 10, 11] loop
+    -- The feed may hold only today's awards, so the previous day's list is kept from what was saved that day
+    -- (Adam, 8 Oct 2026). Awards for the previous day in the feed, if any, are used instead.
+    select data into old from screens.screen_docs where path = 'legends/y' || yr;
+    prev_list := coalesce((select string_agg(line, e'\n' order by form, line) from
+                 (select distinct split_part(forename, ' ', 1) || ' ' || upper(left(surname, 1)) || ', ' || form as line, form from _ll where _ll.y = yr::text and d = prev) t), '');
+    if prev_list = '' and old is not null then
+      prev_list := case when old ->> 'today' = prev::text then coalesce(old ->> 'todayList', '')
+                        when old ->> 'previous' = prev::text then coalesce(old ->> 'previousList', '') else '' end;
+    end if;
     insert into screens.screen_docs (path, data, updated_at)
     select 'legends/y' || yr, jsonb_build_object('source', 'arbor', 'updatedAt', now(), 'today', today, 'previous', prev,
              'todayList', coalesce((select string_agg(line, e'\n' order by form, line) from
                  (select distinct split_part(forename, ' ', 1) || ' ' || upper(left(surname, 1)) || ', ' || form as line, form from _ll where _ll.y = yr::text and d = today) t), ''),
-             'previousList', coalesce((select string_agg(line, e'\n' order by form, line) from
-                 (select distinct split_part(forename, ' ', 1) || ' ' || upper(left(surname, 1)) || ', ' || form as line, form from _ll where _ll.y = yr::text and d = prev) t), '')),
+             'previousList', prev_list),
            now()
     on conflict (path) do update set data = excluded.data, updated_at = excluded.updated_at;
   end loop;
