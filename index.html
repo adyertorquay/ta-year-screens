@@ -540,7 +540,7 @@ const SLIDE_DEFAULTS = {
   breakdown: { title: '', metric: '', segments: [{ label: '', value: 0 }] },
   table: { title: '', subtitle: '', rows: '' },
   birthdays: { title: 'Happy birthday!', people: '' },
-  value: { title: 'Value of the week', value: '', text: '', photo: '' },
+  value: {},
   poster: { title: '', photo: '' },
   info: { title: '', body: '' },
   housepoints: { title: 'House points' },
@@ -576,7 +576,7 @@ function hasContent(s, centre) {
     case 'breakdown': return (s.segments || []).some(x => +x.value > 0);
     case 'table': return parseTable(s.rows).length > 1;
     case 'birthdays': return birthdaysOn(s.people, new Date()).length > 0; // today's only (Adam, 7 Oct 2026)
-    case 'value': return !!s.value;
+    case 'value': return !!valueInfo(new Date());
     case 'poster': return !!s.photo;
     case 'info': return !!(s.title || s.body);
     case 'housepoints': return Object.values(centre.housePoints || {}).some(v => +v > 0);
@@ -1199,6 +1199,50 @@ const isoDay = d => todayISO(d);
 const mondayOf = d => { const m = new Date(d.getFullYear(), d.getMonth(), d.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; };
 const termIndex = d => { const k = isoDay(d); return TERMS.findIndex(([a, b]) => k >= a && k <= b); };
 const isSchoolDay = d => d.getDay() >= 1 && d.getDay() <= 5 && termIndex(d) >= 0 && !NON_PUPIL_DAYS.has(isoDay(d));
+// Value of the week, from the school's "Teaching and Learning Cycles 2026-27" (Adam, 8 Oct 2026). It changes each Monday;
+// in a holiday it shows the value for the week school returns. Next year's list is needed before Sept 2027.
+const VALUE_PLAN = Object.fromEntries(`
+2026-08-31 Hard work|We never give up
+2026-09-07 Integrity|We treat everybody with respect
+2026-09-14 Pride|We believe in ourselves
+2026-09-21 Hard work|We do things properly
+2026-09-28 Integrity|We do the right thing
+2026-10-05 Pride|We take pride in our work
+2026-10-12 Hard work|We are ambitious
+2026-10-19 Integrity|We are honest
+2026-11-02 Pride|We are ready to learn
+2026-11-09 Hard work|We never make excuses
+2026-11-16 Integrity|We accept responsibility
+2026-11-23 Pride|We contribute to our school community
+2026-11-30 Hard work|We never give up
+2026-12-07 Integrity|We treat everybody with respect
+2026-12-14 Pride|We believe in ourselves
+2027-01-04 Hard work|We do things properly
+2027-01-11 Integrity|We do the right thing
+2027-01-18 Pride|We take pride in our work
+2027-01-25 Hard work|We are ambitious
+2027-02-01 Integrity|We are honest
+2027-02-08 Pride|We are ready to learn
+2027-02-22 Hard work|We never make excuses
+2027-03-01 Integrity|We accept responsibility
+2027-03-08 Pride|We contribute to our school community
+2027-03-15 Hard work|We never give up
+2027-03-22 Integrity|We treat everybody with respect
+2027-04-12 Pride|We believe in ourselves
+2027-04-19 Hard work|We do things properly
+2027-04-26 Integrity|We do the right thing
+2027-05-03 Pride|We take pride in our work
+2027-05-10 Hard work|We are ambitious
+2027-05-17 Integrity|We are honest
+2027-05-24 Pride|We are ready to learn
+2027-06-07 Hard work|We never make excuses
+2027-06-14 Integrity|We accept responsibility
+2027-06-21 Pride|We contribute to our school community
+2027-06-28 Hard work|We never give up
+2027-07-05 Integrity|We treat everybody with respect
+2027-07-12 Pride|We believe in ourselves
+`.trim().split('\n').map(l => { const [d, rest] = [l.slice(0, 10), l.slice(11)]; const [value, statement] = rest.split('|'); return [d, { value, statement }]; }));
+const valueInfo = d => { const w = weekInfo(d); return w && VALUE_PLAN[w.monday] || null; };
 // The week a date falls in. In a holiday it gives the week school returns in.
 function weekInfo(d) {
   const k = isoDay(mondayOf(d));
@@ -1690,9 +1734,12 @@ class PortraitStage {
           h('div', { class: 'bcard today' + (ppl.length > 4 ? ' many' : '') }, h('h3', { text: 'Today' }),
             ...(ppl.length ? ppl.map(p => h('p', { text: p.name + (p.group ? ' (' + p.group + ')' : '') })) : [h('p', { text: 'No birthdays' })])))));
       }
-      case 'value':
-        return wrap('p-value', pad(h('div', { class: 's-eyebrow', text: s.title || 'Value of the week' }), h('div', { class: 'value-word', text: s.value || '' }),
-          s.photo ? h('img', { class: 'value-img', src: photoUrl(s.photo), alt: '' }) : null, s.text ? h('p', { class: 'info-p', text: s.text }) : null));
+      case 'value': {
+        // Always from VALUE_PLAN; nothing on it is edited, so old typed-in values and images are ignored.
+        const v = valueInfo(new Date()) || {};
+        return wrap('p-value', pad(h('div', { class: 's-eyebrow', text: 'Value of the week' }), h('div', { class: 'value-word', text: v.value || '' }),
+          v.statement ? h('p', { class: 'info-p', text: v.statement }) : null));
+      }
       case 'week': {
         const auto = weekInfo(new Date()) || {};
         // Always from the school week plan; nothing on it is edited (Adam, 8 Oct 2026), so old saved overrides are ignored.
@@ -2130,7 +2177,7 @@ function viewEditSide(y, side) {
     const F = (label, k, type = 'text', extra = {}, wide = false) => { const f = field(label, 'sl-' + s.id + '-' + k, s[k], v => s[k] = v, type, extra); return wide ? h('div', { class: 'wide' }, f) : f; };
     const body = h('div', { class: 'item' });
     // Homework and house points come from Tutor Slides, so their slides can't be edited (Adam, 8 Oct 2026).
-    const locked = s.type === 'week' || (TUTOR_SLIDES && (s.type === 'housepoints' || (s.type === 'list' && /learning legend/i.test(s.title || '')) || ((s.type === 'stat' || s.type === 'breakdown') && !!hwSource(s))));
+    const locked = s.type === 'week' || s.type === 'value' || (TUTOR_SLIDES && (s.type === 'housepoints' || (s.type === 'list' && /learning legend/i.test(s.title || '')) || ((s.type === 'stat' || s.type === 'breakdown') && !!hwSource(s))));
     const hwKind = TUTOR_SLIDES && (s.type === 'stat' || s.type === 'breakdown') && hwSource(s);
     if (hwKind) body.append(h('p', { class: 'note wide', text: (d => HOMEWORK[hwKind].name + ' comes from Tutor Slides automatically' + (d && d.uploadedAt ? ' (updated ' + agoText(d.uploadedAt) + ')' : '') + ' and can\'t be edited here.')(hwDoc(hwKind)) }));
     else if (TUTOR_SLIDES && s.type === 'housepoints') body.append(h('p', { class: 'note wide', text: 'House points come from Tutor Slides automatically and can\'t be edited here.' }));
@@ -2154,7 +2201,7 @@ function viewEditSide(y, side) {
       case 'table': body.append(F('Title', 'title'), F('Small heading (optional)', 'subtitle'), F('Rows', 'rows', 'textarea', { rows: 7, placeholder: 'Name\tTutor\tPoints' }, true)); break;
       case 'birthdays': body.append(F('Title', 'title', 'text', {}, true), F('Students, one per line ("Name, 7B, dd/mm")', 'people', 'textarea', { rows: 6 }, true),
         h('p', { class: 'note wide', text: store.bdays[y] && store.bdays[y].source === 'arbor' ? (TUTOR_SLIDES ? 'Birthdays come from Tutor Slides automatically' : 'Birthdays now come from Arbor automatically each morning') + ', so this list is not used. Only today\'s birthdays are shown.' : 'Used until the Arbor birthdays feed is connected, then birthdays fill in automatically.' })); break;
-      case 'value': body.append(F('Heading', 'title'), F('Value', 'value'), F('A sentence about it (optional)', 'text', 'textarea', {}, true), photoRow(s, render)); break;
+      case 'value': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school values plan (this week: ' + (v => v ? v.value + ', ' + v.statement : 'no weeks left in the plan')(valueInfo(new Date())) + '). It changes every Monday. There is nothing to edit.' })); break;
       case 'poster': body.append(F('Name (for staff)', 'title', 'text', {}, true), photoRow(s, render)); break;
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
       case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school week plan (this week: ' + (w => w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : 'no school weeks left in the plan')(weekInfo(new Date())) + '). There is nothing to edit.' })); break;
@@ -2162,7 +2209,7 @@ function viewEditSide(y, side) {
     }
     const showId = 'sl-' + s.id + '-show';
     const show = h('input', { type: 'checkbox', id: showId }); show.checked = !s.hidden;
-    const summary = h('span', { class: 'stitle', text: (s.type !== 'week' && (s.title || s.value)) || t.label });
+    const summary = h('span', { class: 'stitle', text: (s.type !== 'week' && s.type !== 'value' && s.title) || t.label });
     const card = h('div', { class: 'scard' + (s.hidden ? ' off' : '') + (selected === s.id ? ' sel' : ''), id: 'sc-' + s.id, onfocusin: () => focusSlide(s.id), onclick: () => focusSlide(s.id), oninput: () => { summary.textContent = s.title || s.value || t.label; } },
       h('div', { class: 'shead' }, h('span', { class: 'pill', text: t.label }), summary, h('label', { class: 'showtog', for: showId }, show, 'On screen')),
       t.hint && !locked ? h('p', { class: 'hint', text: t.hint }) : null, body,
