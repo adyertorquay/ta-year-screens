@@ -435,6 +435,10 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 @keyframes awFlip { 0%, 30% { transform: scaleX(1); } 50%, 80% { transform: scaleX(-1); } 100% { transform: scaleX(1); } }
 @keyframes awLand { from { transform: translateX(0); } to { transform: translateX(-400px); } }
 @keyframes awBreathe { 0%, 100% { transform: scale(.98); } 50% { transform: scale(1.02); } }
+.val-flag { animation: valFlag 2.2s ease-in-out infinite; transform-origin: 263px 68px !important; transform-box: view-box; }
+.val-scale { animation: valScale 6s ease-in-out infinite; transform-origin: 200px 100px !important; }
+@keyframes valFlag { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-5deg) scaleX(.9); } }
+@keyframes valScale { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
 @media (prefers-reduced-motion: reduce) { .slide.aware *, .slide.aware.on * { animation: none !important; } }
 @media (prefers-reduced-motion: reduce) { .tick-track { animation: none; padding-left: 30px; } .slide { transition: none; } }
 </style>
@@ -1426,6 +1430,37 @@ function awarenessEl(key) {
       h('div', { class: 'aw-eyebrow', text: when + ' · ' + fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long' }) }),
       h('div', { class: 'aw-title', text: a.title }), h('div', { class: 'aw-line', text: a.line }), h('div', { class: 'aw-tag', text: a.tag }))));
 }
+// Value of the week posters, in the style of the awareness-day posters: one design per value (Adam, 8 Oct 2026).
+// Colours follow the school's value clips: Hard work blue, Integrity gold, Pride red.
+const VALUE_ART = {
+  'Hard work': { colors: ['#14306E', '#2F6BE0', '#0A1838', '#9CC2FF'],
+    art: `<svg viewBox="0 0 400 400"><g class="aw-twinkle">${awStar(70, 70, 22, '#9CC2FF')}</g><g class="aw-twinkle d2">${awStar(340, 96, 16, '#fff')}</g><g class="aw-twinkle d3">${awStar(58, 196, 14, '#fff')}</g>
+      <path d="M20 360L150 170l50 60 60-110 120 240z" fill="#fff"/><path d="M260 120l26 48-24-10-18 22-14-20z" fill="#D7E6FF"/><path d="M150 170l22 32-20-6-14 18-10-16z" fill="#D7E6FF"/>
+      <path d="M60 360c40-30 80-40 120-60s60-60 90-90" fill="none" stroke="#2F6BE0" stroke-width="8" stroke-dasharray="4 16" stroke-linecap="round"/>
+      <path d="M260 120V48" stroke="#0A1838" stroke-width="7" stroke-linecap="round"/><path class="val-flag" d="M263 50h62l-14 18 14 18h-62z" fill="#FFD166"/></svg>` },
+  'Integrity': { colors: ['#7A5A06', '#E0A91B', '#3D2D02', '#FFE7A3'],
+    art: `<svg viewBox="0 0 400 400"><circle class="aw-pulse" cx="200" cy="200" r="170" fill="#fff" opacity=".08"/>
+      <path d="M200 70v270" stroke="#fff" stroke-width="12" stroke-linecap="round"/><path d="M140 350h120" stroke="#fff" stroke-width="16" stroke-linecap="round"/><circle cx="200" cy="66" r="14" fill="#fff"/>
+      <g class="val-scale"><path d="M80 100h240" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+        <path d="M80 100l-40 110M80 100l40 110M320 100l-40 110M320 100l40 110" stroke="#FFE7A3" stroke-width="4"/>
+        <path d="M30 210h100a50 34 0 0 1-100 0z" fill="#fff"/><path d="M270 210h100a50 34 0 0 1-100 0z" fill="#fff"/>
+        <path d="M62 196l12 12 22-24" fill="none" stroke="#7A5A06" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M320 178c-10-14-30-6-26 8 3 10 26 26 26 26s23-16 26-26c4-14-16-22-26-8z" fill="#E0A91B"/></g></svg>` },
+  'Pride': { colors: ['#7E0E1F', '#E0263F', '#3A0710', '#FFB3BE'],
+    art: `<svg viewBox="0 0 400 400"><g class="aw-spin slow">${Array.from({ length: 12 }, (_, i) => `<path d="M200 200L${(200 + 200 * Math.cos(i * Math.PI / 6 - .13)).toFixed(1)} ${(200 + 200 * Math.sin(i * Math.PI / 6 - .13)).toFixed(1)}L${(200 + 200 * Math.cos(i * Math.PI / 6 + .13)).toFixed(1)} ${(200 + 200 * Math.sin(i * Math.PI / 6 + .13)).toFixed(1)}z" fill="#fff" opacity=".12"/>`).join('')}</g>
+      <g class="aw-bob"><path d="M150 236l-36 130 44-22 26 40 26-110zM250 236l36 130-44-22-26 40-26-110z" fill="#FFB3BE"/>
+        <circle cx="200" cy="170" r="104" fill="#FFD166"/><circle cx="200" cy="170" r="84" fill="#F2B21B"/>${awStar(200, 170, 60, '#fff')}</g>
+      <g class="aw-twinkle">${awStar(64, 80, 22, '#fff')}</g><g class="aw-twinkle d2">${awStar(342, 70, 18, '#FFD166')}</g><g class="aw-twinkle d3">${awStar(346, 300, 20, '#fff')}</g></svg>` },
+};
+function valueEl() {
+  const v = valueInfo(new Date(effDay() + 'T12:00:00')) || {}, a = VALUE_ART[v.value] || VALUE_ART['Pride'];
+  const art = h('div', { class: 'aw-art' }); art.innerHTML = a.art; // fixed artwork from this file, never user text
+  const [c1, c2, c3, c4] = a.colors;
+  return h('div', { class: 'slide aware aw-value', style: `--a1:${c1};--a2:${c2};--a3:${c3};--a4:${c4}` },
+    h('div', { class: 'aw' }, art, h('div', { class: 'aw-text' },
+      h('div', { class: 'aw-eyebrow', text: 'Value of the week' }),
+      h('div', { class: 'aw-title', text: v.value || '' }), h('div', { class: 'aw-line', text: v.statement || '' }))));
+}
 // Students of the week are chosen on Fridays for the week after, so from Friday it moves on to the next school week.
 function sotwWeek(d = new Date()) {
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -1694,6 +1729,7 @@ class PortraitStage {
   }
   slideEl(s, i) {
     if (s.type === 'awareness') return awarenessEl(s.key);
+    if (s.type === 'value') return valueEl();
     const c = HC[(i * 3 + 1) % 8];
     const wrap = (cls, ...kids) => h('div', { class: 'slide ' + cls, style: '--c:' + c }, ...kids);
     const pad = (...kids) => h('div', { class: 'pp' }, ...kids);
