@@ -229,10 +229,10 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .band { display: grid; grid-template-columns: repeat(8, 1fr); }
 .tv-msg { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--tv-ink); font-size: 22px; padding: 24px; }
 .takeover { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vmin; text-align: center; padding: 6vmin;
-  background: radial-gradient(circle at 50% 40%, #2F6BE0, #1A3F9E 45%, #0A1A4A 100%); color: #fff; animation: to-in .5s ease-out; } /* blue, not burgundy (Headteacher, 9 Oct 2026) */
+  background: radial-gradient(circle at 50% 40%, #3A4A63, #232C3B 45%, #0E1116 100%); color: #fff; animation: to-in .5s ease-out; } /* charcoal and gold, not burgundy (Headteacher, 9 Oct 2026) */
 .takeover .ta-logo { height: 18vmin; filter: invert(1); }
 .to-text { font-family: var(--display); font-weight: 700; font-size: 13vmin; line-height: 1; letter-spacing: -.02em; max-width: 16ch; text-wrap: balance; animation: to-pulse 2s ease-in-out infinite; }
-.to-sub { font-weight: 600; font-size: 2.6vmin; letter-spacing: .22em; text-transform: uppercase; color: #BFD8FF; }
+.to-sub { font-weight: 600; font-size: 2.6vmin; letter-spacing: .22em; text-transform: uppercase; color: #F2CF7A; }
 @keyframes to-in { from { opacity: 0; transform: scale(1.04); } }
 @keyframes to-pulse { 50% { transform: scale(1.04); } }
 @media (prefers-reduced-motion: reduce) { .takeover, .to-text { animation: none; } }
