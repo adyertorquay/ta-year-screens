@@ -1261,8 +1261,8 @@ function weekInfo(d) {
 const weekLine = w => !w ? '' : w.label || (w.teaching ? 'Teaching week ' + w.teaching : '');
 
 // ---------- seasonal effects ----------
-// Light effects drawn over every screen on certain days. Fireworks Night: one small firework every few seconds,
-// in the top part of the screen, gone in under two seconds. Turned off when the device asks for reduced motion.
+// Light effects drawn over every screen on certain days. Fireworks Night: a volley of 3 to 5 fireworks every few
+// seconds and a bigger finale about every 40 seconds (Adam, 9 Oct 2026: one at a time didn't have the impact). Turned off when the device asks for reduced motion.
 // A screen link ending in @YYYY-MM-DD (#y7-right@2026-11-05) previews that day's posters and effects.
 // Add a time too (#y7@2026-11-11T10:59) to hold the screen at that time of day, for full-screen messages.
 let previewDate = null, previewTime = null;
@@ -1315,7 +1315,7 @@ class Effects {
       for (const r of rockets) {
         r.y -= 14; ctx.globalAlpha = .8; ctx.strokeStyle = r.c; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.moveTo(r.x, r.y + 40); ctx.lineTo(r.x, r.y); ctx.stroke();
-        if (r.y <= r.ty) { r.done = true; const n = 50 + Math.floor(rnd(0, 20)), sp = rnd(5, 7.5);
+        if (r.y <= r.ty) { r.done = true; const n = 70 + Math.floor(rnd(0, 40)), sp = rnd(6, 9.5);
           for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rnd(-.05, .05), v = sp * rnd(.55, 1);
             this.parts.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: Math.random() < .2 ? '#F4A300' : r.c }); } }
       }
@@ -1328,11 +1328,16 @@ class Effects {
       }
       this.raf = rockets.length || this.parts.length ? requestAnimationFrame(step) : (ctx.clearRect(0, 0, W, H), 0); // idle between fireworks
     };
-    const launch = () => {
-      const x = W * rnd(.12, .88), ty = H * rnd(.12, .38);
-      rockets.push({ x, y: ty + H * .22, ty, c: cols[Math.floor(Math.random() * cols.length)] });
+    const rocket = () => {
+      const x = W * rnd(.08, .92), ty = H * rnd(.1, .45);
+      rockets.push({ x, y: ty + H * rnd(.25, .4), ty, c: cols[Math.floor(Math.random() * cols.length)] });
       if (!this.raf) this.raf = requestAnimationFrame(step);
-      this.next = setTimeout(launch, rnd(3500, 7000));
+    };
+    let volleys = 0;
+    const launch = () => {
+      const finale = ++volleys % 10 === 0, n = finale ? 10 : 3 + Math.floor(rnd(0, 3));
+      for (let i = 0; i < n; i++) setTimeout(() => { if (this.cv === cv) rocket(); }, i * rnd(120, finale ? 220 : 450));
+      this.next = setTimeout(launch, finale ? 6000 : rnd(2500, 4500));
     };
     this.next = setTimeout(launch, 1500);
   }
