@@ -1285,13 +1285,19 @@ class Effects {
   }
   off() { this.host.classList.remove('remember'); clearTimeout(this.next); cancelAnimationFrame(this.raf); this.raf = 0; if (this.cv) this.cv.remove(); this.cv = null; this.parts = []; }
   stop() { clearInterval(this.timer); this.off(); }
-  // Snow: a few dozen slow flakes drifting down over the whole screen. White with a faint blue edge so they show in light mode too.
+  // Snow: a few dozen slow flakes drifting down over the whole screen, settling in a thin layer at the bottom. White with a faint blue edge so they show in light mode too.
   snow() {
     const W = this.host.offsetWidth || 1920, H = this.host.offsetHeight || 1080;
     const cv = this.cv = h('canvas', { class: 'fx' }); cv.width = W; cv.height = H; this.host.append(cv);
     const ctx = cv.getContext('2d'), rnd = (a, b) => a + Math.random() * (b - a);
     const flake = top => ({ x: rnd(0, W), y: top ? rnd(-H, 0) : rnd(0, H), r: rnd(3, 8), vy: rnd(.6, 1.4), sw: rnd(0, 6.28), ss: rnd(.006, .016), a: rnd(.55, .95) });
     const flakes = Array.from({ length: Math.round(W * H / 52000) }, () => flake(false));
+    // A little settled snow along the bottom (Adam, 9 Oct 2026): starts as a thin uneven layer and slowly builds up
+    // where flakes land, never more than about 6% of the screen height (less on the portrait screens) so it doesn't cover the text.
+    const COL = 6, cols = Math.ceil(W / COL) + 1, maxH = Math.min(H * .06, W * .045), ground = new Float32Array(cols);
+    const ph = rnd(0, 6.28); for (let i = 0; i < cols; i++) ground[i] = maxH * (.62 + .14 * Math.sin(i * COL / 170 + ph) + .07 * Math.sin(i * COL / 53 + ph * 2) + rnd(-.015, .015));
+    const settle = x => { const c = Math.round(x / COL);
+      for (let k = -4; k <= 4; k++) { const i = c + k; if (i >= 0 && i < cols) ground[i] = Math.min(maxH, ground[i] + .7 * (1 - Math.abs(k) / 5)); } };
     let last = 0;
     const step = t => {
       this.raf = requestAnimationFrame(step);
@@ -1299,9 +1305,13 @@ class Effects {
       ctx.clearRect(0, 0, W, H); ctx.strokeStyle = 'rgba(70,110,160,.5)'; ctx.lineWidth = 1.5; ctx.fillStyle = '#EEF4FB';
       for (const f of flakes) {
         f.sw += f.ss; f.y += f.vy * 2; f.x += Math.sin(f.sw) * .9;
-        if (f.y - f.r > H) Object.assign(f, flake(true), { y: -10 });
+        const gi = Math.round(f.x / COL), gy = H - (gi >= 0 && gi < cols ? ground[gi] : 0);
+        if (f.y + f.r * .5 > gy) { if (f.x > 0 && f.x < W) settle(f.x); Object.assign(f, flake(true), { y: -10 }); }
         ctx.globalAlpha = f.a; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       }
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.moveTo(0, H);
+      for (let i = 0; i < cols; i++) ctx.lineTo(i * COL, H - ground[i]);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fillStyle = '#F4F8FC'; ctx.fill(); ctx.strokeStyle = 'rgba(70,110,160,.45)'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#EEF4FB';
     };
     this.raf = requestAnimationFrame(step);
   }
