@@ -27,7 +27,7 @@
     const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(docs)); } catch (e) {} };
     const fire = p => (watchers[p] || []).forEach(fn => fn(snap(docs[p] ?? null)));
     const blobs = {};
-    const me = { id: 'demo', name: 'Demo admin', avatarUrl: avatar('Demo admin'), color: '#8A1A4D', email: null, isOwner: true, canEdit: true };
+    const me = { id: 'demo', name: 'Demo admin', avatarUrl: avatar('Demo admin'), color: '#2E3A4F', email: null, isOwner: true, canEdit: true };
     return {
       mode: 'demo',
       db: { doc: p => ({
@@ -94,7 +94,7 @@
     const toProfile = r => ({ id: r.user_id, name: r.name || r.email || '', avatarUrl: avatar(r.name || r.email || ''), isMe: !!session && r.user_id === session.user.id, guest: false, email: r.email || null });
     const me = () => {
       const n = profile ? (profile.name || profile.email || '') : '';
-      return { id: session ? session.user.id : null, name: n, avatarUrl: avatar(n), color: '#8A1A4D', email: session ? session.user.email : null,
+      return { id: session ? session.user.id : null, name: n, avatarUrl: avatar(n), color: '#2E3A4F', email: session ? session.user.email : null,
         isOwner: !!profile && profile.role === 'admin', canEdit: !!profile && profile.role === 'admin' };
     };
     const signedUrls = {};
@@ -177,7 +177,7 @@
 
   function avatar(name) {
     const ini = (name || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
-    return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#8A1A4D"/><text x="20" y="25.5" font-family="Arial" font-weight="700" font-size="15" fill="#fff" text-anchor="middle">${ini.replace(/[<&>]/g, '')}</text></svg>`);
+    return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#2E3A4F"/><text x="20" y="25.5" font-family="Arial" font-weight="700" font-size="15" fill="#fff" text-anchor="middle">${ini.replace(/[<&>]/g, '')}</text></svg>`);
   }
 
   const B = live ? supabaseBackend() : demoBackend();
