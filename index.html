@@ -552,7 +552,10 @@ const SLIDE_DEFAULTS = {
   week: {},
 };
 const newSlide = type => ({ id: uid(), type, hidden: false, ...clone(SLIDE_DEFAULTS[type] || {}) });
-const normalSide = d => Object.assign({ slides: [], slideSeconds: 12 }, d ? clone(d) : {});
+// Only today's Learning Legends are shown, so a "Yesterday's Learning Legends" slide is dropped from the screen and
+// the editor, and goes from the saved screen on the next Save (Adam, 9 Oct 2026).
+const isYesterdayLegends = s => s && s.type === 'list' && /learning legend/i.test(s.title || '') && /yesterday|previous|last/i.test(s.title || '');
+const normalSide = d => { const o = Object.assign({ slides: [], slideSeconds: 12 }, d ? clone(d) : {}); o.slides = (o.slides || []).filter(s => !isYesterdayLegends(s)); return o; };
 const lines = t => String(t || '').split('\n').map(s => s.trim()).filter(Boolean);
 const splitPerson = line => { const p = line.split(/\t| [-–] |,\s*/); return { name: (p[0] || '').trim(), group: (p[1] || '').trim(), extra: (p[2] || '').trim() }; };
 const parseTable = t => lines(t).map(l => (l.includes('\t') ? l.split('\t') : l.split(/\s*,\s*/)).map(c => c.trim()));
